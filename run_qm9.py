@@ -193,8 +193,8 @@ class PlGNNTestonValLRscheduleModule(PlGNNTestonValModule):
             weight_decay=eval(self.args.l2_wd),
         )
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=eval(self.args.factor),
-            patience=eval(self.args.patience), min_lr=eval(self.args.min_lr)
+            optimizer, mode='min', factor=float(self.args.factor),
+            patience=float(self.args.patience), min_lr=float(self.args.min_lr)
         )
         return {
             "optimizer": optimizer,

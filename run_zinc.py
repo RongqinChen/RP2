@@ -57,7 +57,7 @@ def main():
     for i in range(args.runs):
         logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
         # logger = SwanLabLogger(experiment_name=f"Run-{i}", project=MACHINE + args.project_name,
-        #                        logdir=args.save_dir + "/" + args.project_name,
+        #                        logdir=args.save_dir + "/swanlab",
         #                        save_dir=args.save_dir, offline=args.offline)
         logger.log_hyperparams(args)
         timer = Timer(duration=dict(weeks=4))

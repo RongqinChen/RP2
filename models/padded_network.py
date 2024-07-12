@@ -54,7 +54,7 @@ class SpecDistGNN(nn.Module):
 
         # 1st part - mapping input features
         in_channels = pe_len + node_encoder.out_channels + edge_encoder.out_channels
-        self.conv0 = nn.Conv2d(in_channels, hidden_channels, 1)
+        self.conv0 = nn.Conv2d(in_channels, hidden_channels, 1, bias=False)
 
         # 2st part - conv
         self.blocks = nn.ModuleList([

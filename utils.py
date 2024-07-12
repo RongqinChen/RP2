@@ -78,8 +78,8 @@ def update_args(args: argparse.ArgumentParser) -> argparse.ArgumentParser:
         str(args.pe_method),
         str(args.pe_power),
     ]
-    model_cfg = ".".join(arg_list)
-    args.project_name = f"{args.dataset_name}_{model_cfg}"
+    model_cfg = "-".join(arg_list)
+    args.project_name = f"{args.dataset_name}-{model_cfg}"
     args.save_dir = args.save_dir + "/" + args.dataset_name
     os.makedirs(args.save_dir, exist_ok=True)
     return args

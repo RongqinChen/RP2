@@ -5,12 +5,13 @@ import os
 import time
 import torch
 import torchmetrics
-import wandb
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, Timer
-from lightning.pytorch.callbacks.progress import TQDMProgressBar
-# from lightning.pytorch.loggers import WandbLogger
-from swanlab.integration.pytorch_lightning import SwanLabLogger
+# from lightning.pytorch.callbacks.progress import TQDMProgressBar
+import wandb
+from lightning.pytorch.loggers import WandbLogger
+# import swanlab
+# from swanlab.integration.pytorch_lightning import SwanLabLogger
 from torch import Tensor, nn
 from torch_geometric.datasets import ZINC
 
@@ -54,9 +55,10 @@ def main():
 
     MACHINE = os.environ.get("MACHINE", "") + "-"
     for i in range(args.runs):
-        # logger = WandbLogger(f"run_{str(i)}", args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
-        logger = SwanLabLogger(experiment_name=f"run_{str(i)}", project=MACHINE + args.project_name,
-                               save_dir=args.save_dir, logdir=args.save_dir, offline=args.offline)
+        logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
+        # logger = SwanLabLogger(experiment_name=f"Run-{i}", project=MACHINE + args.project_name,
+        #                        logdir=args.save_dir + "/" + args.project_name,
+        #                        save_dir=args.save_dir, offline=args.offline)
         logger.log_hyperparams(args)
         timer = Timer(duration=dict(weeks=4))
 
@@ -80,10 +82,10 @@ def main():
             devices="auto",
             max_epochs=args.num_epochs,
             enable_checkpointing=True,
-            enable_progress_bar=True,
+            enable_progress_bar=False,
             logger=logger,
             callbacks=[
-                TQDMProgressBar(refresh_rate=20),
+                # TQDMProgressBar(refresh_rate=20),
                 ModelCheckpoint(monitor="val/metric", mode="min"),
                 LearningRateMonitor(logging_interval="epoch"),
                 timer

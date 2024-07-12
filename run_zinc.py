@@ -66,7 +66,7 @@ def main():
 
         datamodule = PlPyGDataTestonValModule(
             train_dataset, val_dataset, test_dataset,
-            args.batch_size, args.num_workers, args.drop_last, True,
+            args.batch_size, args.num_workers, args.drop_last, pad2same=True,
         )
         loss_criterion = nn.L1Loss()
         evaluator = torchmetrics.MeanAbsoluteError()

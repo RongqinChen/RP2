@@ -36,7 +36,6 @@ def main():
     parser.add_argument("--config_file", type=str, default="configs/qm9.yaml",
                         help="Additional configuration file for different dataset and models.")
     parser.add_argument("--task", type=int, default=-1, choices=list(range(19)), help="Train target. -1 for all first 12 targets.")
-
     args = parser.parse_args()
     args = utils.update_args(args)
 
@@ -188,7 +187,7 @@ class PlGNNTestonValLRscheduleModule(PlGNNTestonValModule):
         super().__init__(args, model, loss_criterion, evaluator)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(
+        optimizer = torch.optim.AdamW(
             self.model.parameters(), lr=eval(self.args.lr),
             weight_decay=eval(self.args.l2_wd),
         )

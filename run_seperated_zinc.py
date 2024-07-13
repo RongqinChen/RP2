@@ -30,10 +30,9 @@ def main():
     parser.add_argument("--config_file", type=str, default="configs/seperated_zinc.yaml",
                         help="Additional configuration file for different dataset and models.")
     args = parser.parse_args()
-
     args = utils.update_args(args)
-    args.full = False
 
+    args.full = False
     path = "data/ZINC"
     train_dataset = ZINC(path, not args.full, "train")
     val_dataset = ZINC(path, not args.full, "val")

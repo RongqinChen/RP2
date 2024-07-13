@@ -50,6 +50,9 @@ class PlPyGDataModule(LightningDataModule):
                     data.num_nodes for data in val_dataset] + [
                     data.num_nodes for data in test_dataset]
             )
+        else:
+            self.val_dataset = list(sorted(val_dataset, key=lambda data: data.num_nodes))
+            self.test_dataset = list(sorted(test_dataset, key=lambda data: data.num_nodes))
 
     def _get_loader(self, split):
         if split == "train":

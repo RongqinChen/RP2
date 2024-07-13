@@ -38,7 +38,7 @@ def main():
     val_dataset = ZINC(path, not args.full, "val")
     test_dataset = ZINC(path, not args.full, "test")
 
-    # pre-compute Positional encoding
+    # pre-compute positional encoding
     time_start = time.perf_counter()
     pe_computation = PositionalEncodingComputation(args.pe_method, args.pe_power)
     args.pe_len = pe_computation.pe_len

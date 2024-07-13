@@ -1,4 +1,4 @@
-dataset_name: Functional
+dataset_name: Structure
 batch_size: 16
 num_workers: 4
 lr: 3e-4
@@ -14,8 +14,8 @@ drop_prob: 0.2
 graph_pool: avg
 jumping_knowledge: last
 degree_rescalling: True
-task_type: graph_classification
-num_task: 10
+task_type: graph_regression
+num_task: 11
 runs: 5
 pe_method: bern_mixed_sym2
 pe_power: 8

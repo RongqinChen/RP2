@@ -33,7 +33,7 @@ torch.set_float32_matmul_precision('high')
 
 def main():
     parser = utils.args_setup()
-    parser.add_argument("--config_file", type=str, default="configs/qm9.yaml",
+    parser.add_argument("--config_file", type=str, default="configs/padded_qm9.yaml",
                         help="Additional configuration file for different dataset and models.")
     parser.add_argument("--task", type=int, default=-1, choices=list(range(19)), help="Train target. -1 for all first 12 targets.")
     args = parser.parse_args()

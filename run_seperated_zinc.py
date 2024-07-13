@@ -16,7 +16,7 @@ from torch import Tensor, nn
 from torch_geometric.datasets import ZINC
 
 import utils
-from models.model_construction import make_model
+from models.model_construction import make_seperated_model
 from pl_modules.loader import PlPyGDataTestonValModule
 from pl_modules.model import PlGNNTestonValModule
 from positional_encoding import PositionalEncodingComputation
@@ -27,15 +27,13 @@ torch.set_float32_matmul_precision('high')
 
 def main():
     parser = utils.args_setup()
-    parser.add_argument("--config_file", type=str, default="configs/zincfull.yaml",
+    parser.add_argument("--config_file", type=str, default="configs/seperated_zinc.yaml",
                         help="Additional configuration file for different dataset and models.")
     parser.add_argument("--runs", type=int, default=10, help="Number of repeat run.")
     args = parser.parse_args()
 
     args = utils.update_args(args)
-    args.full = True
-    if args.full:
-        args.project_name = "full_" + args.project_name
+    args.full = False
 
     path = "data/ZINC"
     train_dataset = ZINC(path, not args.full, "train")
@@ -44,7 +42,7 @@ def main():
 
     # pre-compute Positional encoding
     time_start = time.perf_counter()
-    pe_computation = PositionalEncodingComputation(args.pe_method, args.pe_power)
+    pe_computation = PositionalEncodingComputation(args.pe_method, args.pe_power, True)
     args.pe_len = pe_computation.pe_len
     train_dataset._data_list = [pe_computation(data) for data in train_dataset]
     val_dataset._data_list = [pe_computation(data) for data in val_dataset]
@@ -68,13 +66,14 @@ def main():
 
         datamodule = PlPyGDataTestonValModule(
             train_dataset, val_dataset, test_dataset,
-            args.batch_size, args.num_workers, args.drop_last, pad2same=True,
+            args.batch_size, args.num_workers, args.drop_last, pad2same=False,
         )
         loss_criterion = nn.L1Loss()
         evaluator = torchmetrics.MeanAbsoluteError()
-        node_encoder = NodeEncoder(28, args.emb_channels)
-        edge_encoder = EdgeEncoder(4, args.emb_channels)
-        model = make_model(args, node_encoder, edge_encoder)
+        node_encoder = NodeEncoder(21, args.hidden_channels)
+        edge_encoder = EdgeEncoder(4, args.hidden_channels)
+        pe_encoder = PELinear(args.pe_len, args.hidden_channels)
+        model = make_seperated_model(args, node_encoder, edge_encoder, pe_encoder)
         modelmodule = PlGNNTestonValModule(args, model, loss_criterion, evaluator)
 
         trainer = Trainer(
@@ -82,7 +81,7 @@ def main():
             devices="auto",
             max_epochs=args.num_epochs,
             enable_checkpointing=True,
-            enable_progress_bar=False,
+            enable_progress_bar=True,
             logger=logger,
             callbacks=[
                 # TQDMProgressBar(refresh_rate=20),
@@ -108,45 +107,51 @@ def main():
     return
 
 
-class NodeEncoder(torch.nn.Module):
-    def __init__(self, num_types, out_channels, padding_idx=0):
+class NodeEncoder(nn.Module):
+    def __init__(self, num_types, out_channels):
         super().__init__()
-        self.emb = nn.Embedding(num_types + 1, out_channels, padding_idx)
+        self.emb = nn.Embedding(num_types, out_channels)
         self.out_channels = out_channels
         self.reset_parameters()
 
     def reset_parameters(self):
         self.emb.reset_parameters()
 
-    def forward(self, batch: dict):
+    def forward(self, node_val: Tensor):
         # Encode just the first dimension if more exist
-        batch_node_attr = batch["batch_node_attr"]
-        B, N, _ = batch_node_attr.size()
-        node_h: Tensor = self.emb(batch_node_attr[:, :, 0].flatten())
-        batch_node_h = node_h.reshape((B, N, -1))  # B, N, H
-        batch_node_h = batch_node_h.permute((0, 2, 1))  # B, H, N
-        batch_full_node_h = torch.diag_embed(batch_node_h)  # B, H, N, N
-        return batch_full_node_h
+        node_h = self.emb(node_val[:, 0])
+        return node_h
 
 
-class EdgeEncoder(torch.nn.Module):
-    def __init__(self, num_types, out_channels, padding_idx=0):
+class EdgeEncoder(nn.Module):
+    def __init__(self, num_types, out_channels):
         super().__init__()
-        self.emb = nn.Embedding(num_types + 1, out_channels, padding_idx)
+        self.emb = nn.Embedding(num_types, out_channels)
         self.out_channels = out_channels
         self.reset_parameters()
 
     def reset_parameters(self):
         self.emb.reset_parameters()
 
-    def forward(self, batch: dict):
+    def forward(self, edge_val: Tensor):
         # Encode just the first dimension if more exist
-        batch_full_edge_attr = batch["batch_full_edge_attr"]
-        B, N, N, _ = batch_full_edge_attr.size()
-        edge_h: Tensor = self.emb(batch_full_edge_attr[:, :, :, 0].flatten())
-        batch_full_edge_h = edge_h.reshape((B, N, N, -1))
-        batch_full_edge_h = batch_full_edge_h.permute((0, 3, 1, 2)).contiguous()
-        return batch_full_edge_h
+        edge_h = self.emb(edge_val[:, 0])
+        return edge_h
+
+
+class PELinear(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.linear = nn.Linear(in_channels, out_channels)
+        self.out_channels = out_channels
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        self.linear.reset_parameters()
+
+    def forward(self, pe_val: Tensor):
+        pe_h = self.linear(pe_val)
+        return pe_h
 
 
 if __name__ == "__main__":

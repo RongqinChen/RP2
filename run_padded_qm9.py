@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 import utils
 from datasets.QM9Dataset import QM9, conversion, target_names
-from models.model_construction import make_model
+from models.model_construction import make_padded_model
 from pl_modules.loader import PlPyGDataTestonValModule
 from pl_modules.model import PlGNNTestonValModule
 from positional_encoding import PositionalEncodingComputation
@@ -97,7 +97,7 @@ def main():
         evaluator = MeanAbsoluteErrorQM9(std.item(), conversion[args.task].item())
         node_encoder = QM9NodeEncoder(out_channels=args.emb_channels)
         edge_encoder = EdgeEncoder(out_channels=args.emb_channels)
-        model = make_model(args, node_encoder, edge_encoder)
+        model = make_padded_model(args, node_encoder, edge_encoder)
         modelmodule = PlGNNTestonValLRscheduleModule(args, model, loss_criterion, evaluator)
 
         trainer = Trainer(

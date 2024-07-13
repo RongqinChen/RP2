@@ -16,7 +16,7 @@ from torch import Tensor, nn
 from torch_geometric.datasets import ZINC
 
 import utils
-from models.model_construction import make_model
+from models.model_construction import make_padded_model
 from pl_modules.loader import PlPyGDataTestonValModule
 from pl_modules.model import PlGNNTestonValModule
 from positional_encoding import PositionalEncodingComputation
@@ -27,15 +27,13 @@ torch.set_float32_matmul_precision('high')
 
 def main():
     parser = utils.args_setup()
-    parser.add_argument("--config_file", type=str, default="configs/zinc.yaml",
+    parser.add_argument("--config_file", type=str, default="configs/zincfull.yaml",
                         help="Additional configuration file for different dataset and models.")
     parser.add_argument("--runs", type=int, default=10, help="Number of repeat run.")
     args = parser.parse_args()
 
     args = utils.update_args(args)
-    args.full = False
-    if args.full:
-        args.project_name = "full_" + args.project_name
+    args.full = True
 
     path = "data/ZINC"
     train_dataset = ZINC(path, not args.full, "train")
@@ -72,9 +70,9 @@ def main():
         )
         loss_criterion = nn.L1Loss()
         evaluator = torchmetrics.MeanAbsoluteError()
-        node_encoder = NodeEncoder(21, args.emb_channels)
+        node_encoder = NodeEncoder(28, args.emb_channels)
         edge_encoder = EdgeEncoder(4, args.emb_channels)
-        model = make_model(args, node_encoder, edge_encoder)
+        model = make_padded_model(args, node_encoder, edge_encoder)
         modelmodule = PlGNNTestonValModule(args, model, loss_criterion, evaluator)
 
         trainer = Trainer(

@@ -7,9 +7,11 @@ class MlpBlock(nn.Module):
     Block of MLP layers with activation function after each (1x1 conv2d layers).
     """
 
-    def __init__(self, channels, mlp_depth, activation_fn=nn.functional.relu):
+    def __init__(self, channels, mlp_depth, drop_prob=0.0,
+                 activation_fn=nn.functional.relu):
         super().__init__()
         self.activation = activation_fn
+        self.dropout = nn.Dropout(drop_prob)
         self.convs = nn.ModuleList()
         self.norms = nn.ModuleList()
         for _ in range(mlp_depth):
@@ -24,31 +26,32 @@ class MlpBlock(nn.Module):
             out = self.convs[idx](out)
             out = self.norms[idx](out)
             out = self.activation(out)
+            out = self.dropout(out)
 
         return out
 
 
 class PaddedBlockMatmulConv(nn.Module):
-    def __init__(self, channels, mlp_depth) -> None:
+    def __init__(self, channels, mlp_depth, drop_prob=0.0) -> None:
         super().__init__()
-        self.mlp1 = MlpBlock(channels, mlp_depth)
-        self.mlp2 = MlpBlock(channels, mlp_depth)
+        self.mlp1 = MlpBlock(channels, mlp_depth, drop_prob)
+        self.mlp2 = MlpBlock(channels, mlp_depth, drop_prob)
 
     def forward(self, inputs) -> Tensor:  # inputs: B, H, N, N
         mlp1 = self.mlp1(inputs)
         mlp2 = self.mlp2(inputs)
         mult = torch.matmul(mlp1, mlp2) / inputs.shape[-1]
         # mult = torch.sqrt(torch.relu(mult)) - torch.sqrt(torch.relu(-mult))
-        mult = torch.sqrt(torch.relu(mult))
+        mult = torch.sqrt(mult)
         return mult
 
 
 class PaddedBlockConv(nn.Module):
-    def __init__(self, channels, mlp_depth) -> None:
+    def __init__(self, channels, mlp_depth, drop_prob) -> None:
         super().__init__()
-        self.matmul_conv = PaddedBlockMatmulConv(channels, mlp_depth)
+        self.matmul_conv = PaddedBlockMatmulConv(channels, mlp_depth, drop_prob)
         self.skip = nn.Conv2d(channels, channels, kernel_size=1, padding=0, bias=True)
-        self.update = MlpBlock(channels, 2)
+        self.update = MlpBlock(channels, 2, drop_prob)
 
     def forward(self, inputs):
         h = self.matmul_conv(inputs) + self.skip(inputs)

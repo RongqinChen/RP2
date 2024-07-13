@@ -27,12 +27,13 @@ torch.set_float32_matmul_precision('high')
 
 def main():
     parser = utils.args_setup()
-    parser.add_argument("--config_file", type=str, default="configs/seperated_zinc.yaml",
+    parser.add_argument("--config_file", type=str, default="configs/seperated_zincfull.yaml",
                         help="Additional configuration file for different dataset and models.")
+    parser.add_argument("--runs", type=int, default=5, help="Number of repeat run.")
     args = parser.parse_args()
 
     args = utils.update_args(args)
-    args.full = False
+    args.full = True
 
     path = "data/ZINC"
     train_dataset = ZINC(path, not args.full, "train")

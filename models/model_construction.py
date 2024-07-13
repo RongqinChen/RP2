@@ -4,8 +4,6 @@ Model construction.
 
 from argparse import ArgumentParser
 from torch import nn
-
-
 from models.padded_network import Padded_SpecDistGNN
 from models.seperated_network import Seperated_SpecDistGNN
 
@@ -32,10 +30,10 @@ def make_padded_model(
         args.graph_pool,
         args.drop_prob,
         args.jumping_knowledge,
+        args.degree_rescalling,
         args.task_type,
         args.num_task,
     )
-
     return gnn
 
 
@@ -54,7 +52,6 @@ def make_seperated_model(
     """
 
     gnn = Seperated_SpecDistGNN(
-        args.pe_len,
         node_encoder, edge_encoder, pe_encoder,
         args.hidden_channels,
         args.num_layers,
@@ -63,8 +60,8 @@ def make_seperated_model(
         args.graph_pool,
         args.drop_prob,
         args.jumping_knowledge,
+        args.degree_rescalling,
         args.task_type,
         args.num_task,
     )
-
     return gnn

@@ -2,14 +2,16 @@
 Padded_SpecDistGNN framework.
 """
 
-from typing import Optional
+from typing import Optional, Dict
+
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch_geometric.data import Data
-from .mlp import MLP
-from .padded_block_conv import PaddedBlockConv
-from .padded_pooling import padded_graph_avg_pool
+
+from .basic import JK_MLP
+from .block_layer import BlockUpdateLayer
+from .block_pooling import block_avg_pooling, block_sum_pooling
+from .degree_rescaler import DegreeRescaler
 from .output_decoder import GraphClassification, GraphRegression, NodeClassification
 
 
@@ -38,9 +40,10 @@ class Padded_SpecDistGNN(nn.Module):
         num_layers: int,
         mlp_depth: int,
         norm_type: Optional[str] = "Batch",
-        graph_pool: nn.Module = None,
+        graph_pool: Optional[str] = "avg",
         drop_prob: Optional[float] = 0.0,
         jumping_knowledge: bool = False,
+        degree_rescalling: bool = True,
         task_type: str = "graph_classfication",
         num_tasks: int = 1,
     ):
@@ -49,24 +52,36 @@ class Padded_SpecDistGNN(nn.Module):
         self.norm_type = norm_type
         self.drop_prob = drop_prob
         self.dropout = nn.Dropout(drop_prob)
-        self.node_encoder = node_encoder
-        self.edge_encoder = edge_encoder
 
         # 1st part - mapping input features
+        self.node_encoder = node_encoder
+        self.edge_encoder = edge_encoder
         in_channels = pe_len + node_encoder.out_channels + edge_encoder.out_channels
         self.conv0 = nn.Conv2d(in_channels, hidden_channels, 1, bias=False)
 
-        # 2st part - conv
+        # 2st part - convolution
         self.blocks = nn.ModuleList([
-            PaddedBlockConv(hidden_channels, mlp_depth, drop_prob)
+            BlockUpdateLayer(hidden_channels, mlp_depth, drop_prob)
             for _ in range(num_layers)
         ])
 
-        self.graph_pool = padded_graph_avg_pool
-        jk_channels = hidden_channels * 2 * (num_layers + 1)
-        self.jk_mlp = MLP(jk_channels, hidden_channels) if jumping_knowledge == "concat" else None
+        # 3st part - readout
+        if graph_pool in {"mean", "avg"}:
+            self.graph_pool = block_avg_pooling
+        else:
+            self.graph_pool = block_sum_pooling
 
-        self.act = nn.ReLU()
+        jk_channels = hidden_channels * 2 * (num_layers + 1)
+        self.jk_mlp = JK_MLP(jk_channels, hidden_channels) if jumping_knowledge == "concat" else None
+
+        # 4th part - degree rescalling
+        if degree_rescalling:
+            assert graph_pool in {"avg", "mean"}
+            self.degree_rescaler = DegreeRescaler(hidden_channels * 2)
+        else:
+            self.degree_rescaler = None
+
+        # 5th part - output decoding
         if task_type == "graph_classification":
             self.out_decoder = GraphClassification(hidden_channels * 2, num_tasks)
         elif task_type == "graph_regression":
@@ -78,26 +93,37 @@ class Padded_SpecDistGNN(nn.Module):
 
         self.reset_parameters()
 
-    def weights_init(self, m: nn.Module):
-        if hasattr(m, "reset_parameters"):
+    def _init_weights(self, m: nn.Module):
+        if isinstance(m, nn.Conv2d):
+            nn.init.kaiming_normal_(m.weight)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+        elif hasattr(m, "reset_parameters"):
             m.reset_parameters()
 
     def reset_parameters(self):
-        self.blocks.apply(self.weights_init)
+        self.node_encoder.apply(self._init_weights)
+        self.edge_encoder.apply(self._init_weights)
+        self.conv0.apply(self._init_weights)
+        self.blocks.apply(self._init_weights)
         if self.jk_mlp is not None:
-            self.jk_mlp.apply(self.weights_init)
-        self.out_decoder.apply(self.weights_init)
+            self.jk_mlp.apply(self._init_weights)
+        self.out_decoder.apply(self._init_weights)
 
-    def forward(self, data: Data) -> Tensor:
+    def forward(self, data: Dict[str, Tensor]) -> Tensor:
         hs = [data["batch_full_pe"]]
         hs += [self.node_encoder(data)] if self.node_encoder is not None else []
         hs += [self.edge_encoder(data)] if self.edge_encoder is not None else []
-        h = torch.cat(hs, 1)
+        h = torch.cat(hs, 1) if len(hs) > 1 else hs[0]
         h = self.conv0(h)
+
+        degrees = data["batch_num_nodes"]
+        log_degrees = torch.log(degrees + 1.)
+        log_degrees = log_degrees.view((-1, 1, 1, 1))
 
         h_list = []
         for block in self.blocks:
-            h = block(h)
+            h = block(h, log_degrees)
             h_list.append(h)
 
         if self.jk_mlp is not None:
@@ -105,6 +131,10 @@ class Padded_SpecDistGNN(nn.Module):
             z = self.jk_mlp(torch.cat(z_list, 1))
         else:
             z = self.graph_pool(h_list[-1])
+
+        if self.degree_rescaler is not None:
+            log_degrees = log_degrees.view((-1, 1))
+            z = self.degree_rescaler(z, log_degrees)
 
         out = self.out_decoder(z)
         return out

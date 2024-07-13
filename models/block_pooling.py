@@ -2,7 +2,7 @@ import torch
 from torch import Tensor
 
 
-def padded_graph_avg_pool(inputs: Tensor) -> Tensor:
+def block_avg_pooling(inputs: Tensor) -> Tensor:
     # inputs.shape: B, H, N, N
     N = inputs.shape[-1]
     diag_sum = torch.sum(torch.diagonal(inputs, dim1=-2, dim2=-1), dim=2)  # B, H
@@ -12,7 +12,7 @@ def padded_graph_avg_pool(inputs: Tensor) -> Tensor:
     return outputs
 
 
-def padded_graph_sum_pool(inputs: Tensor) -> Tensor:
+def block_sum_pooling(inputs: Tensor) -> Tensor:
     # inputs.shape: B, H, N, N
     diag_sum = torch.sum(torch.diagonal(inputs, dim1=-2, dim2=-1), dim=2)  # B, H
     offdiag_sum = (torch.sum(inputs, dim=[-1, -2]) - diag_sum)

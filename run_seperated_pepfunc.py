@@ -30,7 +30,7 @@ torch.set_float32_matmul_precision('medium')
 
 def main():
     parser = utils.args_setup()
-    parser.add_argument("--config_file", type=str, default="configs/functional.yaml",
+    parser.add_argument("--config_file", type=str, default="configs/pep_functional.yaml",
                         help="Additional configuration file for different dataset and models.")
     args = parser.parse_args()
     args = utils.update_args(args)

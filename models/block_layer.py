@@ -71,7 +71,8 @@ class BlockUpdateLayer(nn.Module):
         self.matmul_conv = BlockMatmulConv(channels, mlp_depth, drop_prob)
         # self.skip = nn.Conv2d(channels, channels, kernel_size=1, bias=True)
         self.norm = nn.BatchNorm2d(channels)
-        self.update = BlockMLP(channels, 2, drop_prob)
+        self.update = BlockMLP(2 * channels, channels, 2, drop_prob)
+        self.activation = nn.ReLU()
 
     def reset_parameters(self):
         self.matmul_conv.apply(_init_weights)
@@ -81,7 +82,7 @@ class BlockUpdateLayer(nn.Module):
 
     def forward(self, inputs, log_degrees):
         h = self.matmul_conv(inputs, log_degrees)
-        h = self.norm(h)
+        h = self.activation(self.norm(h))
         h = torch.cat((inputs, h), 1)
         h = self.update(h) + inputs
         return h

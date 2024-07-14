@@ -17,7 +17,6 @@ jumping_knowledge: last
 degree_rescalling: True
 task_type: graph_regression
 num_task: 1
-runs: 5
 pe_method: bern_mixed_sym2
 pe_power: 16
 test_eval_interval: 10

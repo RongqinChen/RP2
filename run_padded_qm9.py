@@ -8,11 +8,11 @@ import time
 import torch
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, Timer
-# from lightning.pytorch.callbacks.progress import TQDMProgressBar
-# import swanlab
-# from swanlab.integration.pytorch_lightning import SwanLabLogger
-import wandb
-from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.callbacks.progress import TQDMProgressBar
+import swanlab
+from swanlab.integration.pytorch_lightning import SwanLabLogger
+# import wandb
+# from lightning.pytorch.loggers import WandbLogger
 from torch import Tensor, nn
 from torch_geometric.data import Data
 from torchmetrics import MeanAbsoluteError
@@ -77,10 +77,10 @@ def main():
         val_dataset._data_list = dataset._data_list
 
         MACHINE = os.environ.get("MACHINE", "") + "-Adam"
-        logger = WandbLogger(target_names[target], args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
-        # logger = SwanLabLogger(experiment_name=target_names[target], project=MACHINE + args.project_name,
-        #                        save_dir=args.save_dir, logdir=args.save_dir + "/swanlab",
-        #                        offline=args.offline)
+        # logger = WandbLogger(target_names[target], args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
+        logger = SwanLabLogger(experiment_name=target_names[target], project=MACHINE + args.project_name,
+                               logdir="results/swanlab", save_dir=args.save_dir, 
+                               mode="local" if args.offline else None)
         logger.log_hyperparams(args)
         timer = Timer(duration=dict(weeks=4))
 

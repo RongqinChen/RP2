@@ -13,7 +13,7 @@ norm_type: Batch
 drop_prob: 0.2
 graph_pool: avg
 jumping_knowledge: last
-degree_rescalling: True
+degree_rescalling: False
 task_type: graph_classification
 num_task: 10
 runs: 5

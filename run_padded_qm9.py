@@ -76,7 +76,7 @@ def main():
         test_dataset._data_list = dataset._data_list
         val_dataset._data_list = dataset._data_list
 
-        MACHINE = os.environ.get("MACHINE", "") + "-Adam"
+        MACHINE = os.environ.get("MACHINE", "") + "-AdamW-NoReScl"
         logger = WandbLogger(target_names[target], args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
         # logger = SwanLabLogger(experiment_name=target_names[target], project=MACHINE + args.project_name,
         #                        save_dir=args.save_dir, logdir=args.save_dir + "/swanlab",
@@ -187,7 +187,7 @@ class PlGNNTestonValLRscheduleModule(PlGNNTestonValModule):
         super().__init__(args, model, loss_criterion, evaluator)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(
+        optimizer = torch.optim.AdamW(
             self.model.parameters(), lr=eval(self.args.lr),
             weight_decay=eval(self.args.l2_wd),
         )

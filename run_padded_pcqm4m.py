@@ -1,25 +1,29 @@
 """
-script to run on ZINC task.
+script to run on QM9 tasks.
 """
+
 import os
 import time
+import numpy as np
 import torch
-import torchmetrics
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, Timer
 # from lightning.pytorch.callbacks.progress import TQDMProgressBar
-# import wandb
-# from lightning.pytorch.loggers import WandbLogger
 import swanlab
 from swanlab.integration.pytorch_lightning import SwanLabLogger
-from torch import Tensor, nn
-from torch_geometric.datasets import ZINC
+# import wandb
+# from lightning.pytorch.loggers import WandbLogger
+from torch import nn
+from torchmetrics import MeanAbsoluteError
+from tqdm import tqdm
 
 import utils
+from ogb.lsc import PygPCQM4Mv2Dataset
 from models.model_construction import make_padded_model
 from pl_modules.loader import PlPyGDataTestonValModule
 from pl_modules.model import PlGNNTestonValModule
 from positional_encoding import PositionalEncodingComputation
+
 
 torch.set_num_threads(8)
 torch.set_float32_matmul_precision('high')
@@ -27,24 +31,31 @@ torch.set_float32_matmul_precision('high')
 
 def main():
     parser = utils.args_setup()
-    parser.add_argument("--config_file", type=str, default="configs/padded_zinc.yaml",
+    parser.add_argument("--config_file", type=str, default="configs/padded_pcqm4m.yaml",
                         help="Additional configuration file for different dataset and models.")
     args = parser.parse_args()
     args = utils.update_args(args)
 
-    args.full = False
-    path = "data/ZINC"
-    train_dataset = ZINC(path, not args.full, "train")
-    val_dataset = ZINC(path, not args.full, "val")
-    test_dataset = ZINC(path, not args.full, "test")
-
-    # pre-compute positional encoding
+    dataset = PygPCQM4Mv2Dataset("data")
+    split_idx = dataset.get_idx_split()
+    rng = np.random.default_rng(seed=42)
+    train_idx = rng.permutation(split_idx["train"].numpy()).tolist()
+    # Leave out 150k graphs for a new validation set.
+    val_idx, train_idx = train_idx[:150000], train_idx[150000:]
+    test_idx = split_idx["valid"].tolist()
+    train_dataset = [dataset[idx] for idx in train_idx]
+    val_dataset = [dataset[idx] for idx in val_idx]
+    test_dataset = [dataset[idx] for idx in test_idx]
+    
+    # pre-computing positional encoding
     time_start = time.perf_counter()
     pe_computation = PositionalEncodingComputation(args.pe_method, args.pe_power)
     args.pe_len = pe_computation.pe_len
-    train_dataset._data_list = [pe_computation(data) for data in train_dataset]
-    val_dataset._data_list = [pe_computation(data) for data in val_dataset]
-    test_dataset._data_list = [pe_computation(data) for data in test_dataset]
+    
+    train_dataset = [pe_computation(data) for data in tqdm(train_dataset, 'Computing PE for training set..')]
+    val_dataset = [pe_computation(data) for data in tqdm(val_dataset, 'Computing PE for validation set..')]
+    test_dataset = [pe_computation(data) for data in tqdm(test_dataset, 'Computing PE for testing set..')]
+
     pe_elapsed = time.perf_counter() - time_start
     pe_elapsed = time.strftime("%H:%M:%S", time.gmtime(pe_elapsed)) + f"{pe_elapsed:.2f}"[-3:]
     print(f"Took {pe_elapsed} to compute positional encoding ({args.pe_method}, {args.pe_power}).")
@@ -54,7 +65,7 @@ def main():
         # logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
         logger = SwanLabLogger(experiment_name=f"Run-{i}", 
                                project=MACHINE + args.project_name,
-                               logdir=f"results/swanlab",
+                               logdir=f"results/PCQM4Mv2/swanlab",
                                save_dir=args.save_dir,
                                mode="local" if args.offline else None)
         logger.log_hyperparams(args)
@@ -69,9 +80,9 @@ def main():
             args.batch_size, args.num_workers, args.drop_last, pad2same=True,
         )
         loss_criterion = nn.L1Loss()
-        evaluator = torchmetrics.MeanAbsoluteError()
-        node_encoder = NodeEncoder(21, args.emb_channels)
-        edge_encoder = EdgeEncoder(4, args.emb_channels)
+        evaluator = MeanAbsoluteError()
+        node_encoder = AtomEncoder(args.emb_channels)
+        edge_encoder = BondEncoder(args.emb_channels)
         model = make_padded_model(args, node_encoder, edge_encoder)
         modelmodule = PlGNNTestonValModule(args, model, loss_criterion, evaluator)
 
@@ -107,45 +118,64 @@ def main():
     return
 
 
-class NodeEncoder(torch.nn.Module):
-    def __init__(self, num_types, out_channels, padding_idx=0):
+class AtomEncoder(torch.nn.Module):
+    r"""The atom encoder used in OGB molecule dataset.
+
+    Args:
+        emb_dim (int): The output embedding dimension.
+
+    Example:
+        >>> encoder = AtomEncoder(emb_dim=16)
+        >>> batch = torch.randint(0, 10, (10, 3))
+        >>> encoder(batch).size()
+        torch.Size([10, 16])
+    """
+    def __init__(self, emb_dim, *args, **kwargs):
         super().__init__()
-        self.emb = nn.Embedding(num_types + 1, out_channels, padding_idx)
-        self.out_channels = out_channels
-        self.reset_parameters()
+        self.out_channels = emb_dim
+        from ogb.utils.features import get_atom_feature_dims
+        self.atom_embedding_list = torch.nn.ModuleList()
+        for dim in get_atom_feature_dims():
+            emb = torch.nn.Embedding(dim, emb_dim)
+            torch.nn.init.xavier_uniform_(emb.weight.data)
+            self.atom_embedding_list.append(emb)
 
-    def reset_parameters(self):
-        self.emb.reset_parameters()
+    def forward(self, x):
+        node_h = 0
+        for idx, embedding in enumerate(self.atom_embedding_list):
+            node_h += embedding(x[:, idx])
 
-    def forward(self, batch: dict):
-        # Encode just the first dimension if more exist
-        batch_node_attr = batch["batch_node_attr"]
-        B, N, _ = batch_node_attr.size()
-        node_h: Tensor = self.emb(batch_node_attr[:, :, 0].flatten())
-        batch_node_h = node_h.reshape((B, N, -1))  # B, N, H
-        batch_node_h = batch_node_h.permute((0, 2, 1))  # B, H, N
-        batch_full_node_h = torch.diag_embed(batch_node_h)  # B, H, N, N
-        return batch_full_node_h
+        return node_h
 
 
-class EdgeEncoder(torch.nn.Module):
-    def __init__(self, num_types, out_channels, padding_idx=0):
+class BondEncoder(torch.nn.Module):
+    r"""The bond encoder used in OGB molecule dataset.
+
+    Args:
+        emb_dim (int): The output embedding dimension.
+
+    Example:
+        >>> encoder = BondEncoder(emb_dim=16)
+        >>> batch = torch.randint(0, 10, (10, 3))
+        >>> encoder(batch).size()
+        torch.Size([10, 16])
+    """
+    def __init__(self, emb_dim: int):
         super().__init__()
-        self.emb = nn.Embedding(num_types + 1, out_channels, padding_idx)
-        self.out_channels = out_channels
-        self.reset_parameters()
+        self.out_channels = emb_dim
+        from ogb.utils.features import get_bond_feature_dims
+        self.bond_embedding_list = torch.nn.ModuleList()
+        for dim in get_bond_feature_dims():
+            emb = torch.nn.Embedding(dim, emb_dim)
+            torch.nn.init.xavier_uniform_(emb.weight.data)
+            self.bond_embedding_list.append(emb)
 
-    def reset_parameters(self):
-        self.emb.reset_parameters()
+    def forward(self, x):
+        edge_h = 0
+        for idx, embedding in enumerate(self.bond_embedding_list):
+            edge_h += embedding(x[:, idx])
 
-    def forward(self, batch: dict):
-        # Encode just the first dimension if more exist
-        batch_full_edge_attr = batch["batch_full_edge_attr"]
-        B, N, N, _ = batch_full_edge_attr.size()
-        edge_h: Tensor = self.emb(batch_full_edge_attr[:, :, :, 0].flatten())
-        batch_full_edge_h = edge_h.reshape((B, N, N, -1))
-        batch_full_edge_h = batch_full_edge_h.permute((0, 3, 1, 2)).contiguous()
-        return batch_full_edge_h
+        return edge_h
 
 
 if __name__ == "__main__":

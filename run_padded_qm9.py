@@ -8,7 +8,7 @@ import time
 import torch
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, Timer
-from lightning.pytorch.callbacks.progress import TQDMProgressBar
+# from lightning.pytorch.callbacks.progress import TQDMProgressBar
 import swanlab
 from swanlab.integration.pytorch_lightning import SwanLabLogger
 # import wandb
@@ -78,8 +78,10 @@ def main():
 
         MACHINE = os.environ.get("MACHINE", "") + "-Adam"
         # logger = WandbLogger(target_names[target], args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
-        logger = SwanLabLogger(experiment_name=target_names[target], project=MACHINE + args.project_name,
-                               logdir="results/swanlab", save_dir=args.save_dir, 
+        logger = SwanLabLogger(experiment_name=target_names[target],
+                               project=MACHINE + args.project_name,
+                               logdir=f"results/swanlab",
+                               save_dir=args.save_dir,
                                mode="local" if args.offline else None)
         logger.log_hyperparams(args)
         timer = Timer(duration=dict(weeks=4))
@@ -125,7 +127,7 @@ def main():
         print("PE computation time:", pe_elapsed)
         print("torch.cuda.max_memory_reserved: %fGB" % (torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024))
         logger.log_metrics(results)
-        wandb.finish()
+        swanlab.finish()
 
     return
 

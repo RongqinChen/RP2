@@ -97,13 +97,6 @@ class PlGNNModule(LightningModule):
         scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, -1)
         return [optimizer], [scheduler]
 
-    def get_progress_bar_dict(self) -> Dict:
-        r"""Remove 'v_num' in progress bar for clarity"""
-        tqdm_dict = super().get_progress_bar_dict()
-        if 'v_num' in tqdm_dict:
-            del tqdm_dict['v_num']
-        return tqdm_dict
-
 
 class PlGNNTestonValModule(PlGNNModule):
     r"""Given a preset evaluation interval, run test dataset during validation

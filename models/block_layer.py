@@ -56,9 +56,9 @@ class BlockMatmulConv(nn.Module):
     def forward(self, x, log_degrees):  # x: B, H, N, N
         mlp1 = self.mlp1(x)
         mlp2 = self.mlp2(x)
-        # x = torch.matmul(mlp1, mlp2) / x.shape[-1]
-        x = torch.matmul(mlp1, mlp2)
+        x = torch.matmul(mlp1, mlp2) / x.shape[-1]
         x = torch.sqrt(torch.relu(x))
+        # x = torch.matmul(mlp1, mlp2)
 
         # x = torch.stack([x, x * log_degrees], dim=-1)
         # x = (x * self.scale_weight).sum(dim=-1)
@@ -69,20 +69,21 @@ class BlockUpdateLayer(nn.Module):
     def __init__(self, channels, mlp_depth, drop_prob) -> None:
         super().__init__()
         self.matmul_conv = BlockMatmulConv(channels, mlp_depth, drop_prob)
+        self.update = BlockMLP(channels, channels, 2, drop_prob)
         # self.skip = nn.Conv2d(channels, channels, kernel_size=1, bias=True)
-        self.norm = nn.BatchNorm2d(channels)
-        self.update = BlockMLP(2 * channels, channels, 2, drop_prob)
-        self.activation = nn.ReLU()
+        # self.norm = nn.BatchNorm2d(channels)
+        # self.activation = nn.ReLU()
 
     def reset_parameters(self):
         self.matmul_conv.apply(_init_weights)
-        # self.skip.apply(_init_weights)
-        self.norm.apply(_init_weights)
         self.update.apply(_init_weights)
+        # self.skip.apply(_init_weights)
+        # self.norm.apply(_init_weights)
 
-    def forward(self, inputs, log_degrees):
-        h = self.matmul_conv(inputs, log_degrees)
-        h = self.activation(self.norm(h))
-        h = torch.cat((inputs, h), 1)
-        h = self.update(h) + inputs
+    def forward(self, x, log_degrees):
+        h = self.matmul_conv(x, log_degrees)
+        # h = self.activation(self.norm(h))
+        # h = torch.cat((x, h), 1)
+        h = h + x
+        h = self.update(h) + h
         return h

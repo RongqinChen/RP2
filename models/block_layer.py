@@ -19,9 +19,11 @@ class BlockMLP(nn.Module):
         super().__init__()
         self.activation = nn.ReLU()
         self.dropout = nn.Dropout(drop_prob)
+        self.norms = nn.ModuleList()
         self.convs = nn.ModuleList()
         for _ in range(mlp_depth):
             self.convs.append(nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=True))
+            self.norms.append(nn.BatchNorm2d(out_channels))
             in_channels = out_channels
 
     def reset_parameters(self):
@@ -31,6 +33,7 @@ class BlockMLP(nn.Module):
         out = inputs
         for idx in range(len(self.convs)):
             out = self.convs[idx](out)
+            out = self.norms[idx](out)
             out = self.activation(out)
 
         return out

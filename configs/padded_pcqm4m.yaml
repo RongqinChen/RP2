@@ -9,7 +9,7 @@ num_warmup_epochs: 20
 emb_channels: 32
 hidden_channels: 512
 num_layers: 10
-mlp_depth: 2
+mlp_depth: 1
 norm_type: Batch
 drop_prob: 0.01
 graph_pool: avg

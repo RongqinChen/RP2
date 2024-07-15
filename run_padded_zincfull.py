@@ -8,10 +8,10 @@ import torchmetrics
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, Timer
 # from lightning.pytorch.callbacks.progress import TQDMProgressBar
-import wandb
-from lightning.pytorch.loggers import WandbLogger
-# import swanlab
-# from swanlab.integration.pytorch_lightning import SwanLabLogger
+# import wandb
+# from lightning.pytorch.loggers import WandbLogger
+import swanlab
+from swanlab.integration.pytorch_lightning import SwanLabLogger
 from torch import Tensor, nn
 from torch_geometric.datasets import ZINC
 
@@ -27,7 +27,7 @@ torch.set_float32_matmul_precision('high')
 
 def main():
     parser = utils.args_setup()
-    parser.add_argument("--config_file", type=str, default="configs/zincfull.yaml",
+    parser.add_argument("--config_file", type=str, default="configs/padded_zincfull.yaml",
                         help="Additional configuration file for different dataset and models.")
     args = parser.parse_args()
     args = utils.update_args(args)
@@ -51,10 +51,12 @@ def main():
 
     MACHINE = os.environ.get("MACHINE", "") + "-"
     for i in range(args.runs):
-        logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
-        # logger = SwanLabLogger(experiment_name=f"Run-{i}", project=MACHINE + args.project_name,
-        #                        logdir=args.save_dir + "/swanlab",
-        #                        save_dir=args.save_dir, offline=args.offline)
+        # logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
+        logger = SwanLabLogger(experiment_name=f"Run-{i}",
+                               project=MACHINE + args.project_name,
+                               logdir="results/ZincFull/swanlab",
+                               save_dir=args.save_dir,
+                               mode="local" if args.offline else None)
         logger.log_hyperparams(args)
         timer = Timer(duration=dict(weeks=4))
 
@@ -99,7 +101,7 @@ def main():
         print("PE computation time:", pe_elapsed)
         print("torch.cuda.max_memory_reserved: %fGB" % (torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024))
         logger.log_metrics(results)
-        wandb.finish()
+        swanlab.finish()
 
     return
 

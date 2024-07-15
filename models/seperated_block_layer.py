@@ -1,7 +1,8 @@
 from typing import List
 import torch
 from torch import nn, Tensor
-from .block_layer import BlockMatmulConv, BlockMLP
+from .basic import Linear
+from .block_layer import BlockMatmulConv
 
 
 def _init_weights(m: nn.Module):
@@ -19,7 +20,12 @@ class SeperatedBlockUpdateLayer(nn.Module):
         self.matmul_conv = BlockMatmulConv(channels, mlp_depth, drop_prob)
         # self.skip = nn.Conv2d(channels, channels, kernel_size=1, bias=True)
         self.norm = nn.BatchNorm2d(channels)
-        self.update = BlockMLP(2 * channels, channels, 2, drop_prob)
+        self.update = nn.Sequential(
+            Linear(channels, channels, bias_initializer="zeros"),
+            nn.BatchNorm1d(channels), nn.ReLU(),
+            Linear(channels, channels, bias_initializer="zeros"),
+            nn.BatchNorm1d(channels), nn.ReLU(),
+        )
         self.activation = nn.ReLU()
 
     def reset_parameters(self):
@@ -37,6 +43,6 @@ class SeperatedBlockUpdateLayer(nn.Module):
         hs = [h.permute((0, 2, 3, 1)).flatten(0, 2) for h in hs]
         h = torch.cat(hs).contiguous()
 
-        h = torch.cat((x, h), 1)
-        h = self.update(h) + x
+        h = h + x
+        h = self.update(h) + h
         return h

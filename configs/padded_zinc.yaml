@@ -7,7 +7,7 @@ l2_wd: 1e-5
 num_epochs: 2000
 num_warmup_epochs: 50
 emb_channels: 16
-hidden_channels: 80
+hidden_channels: 88
 num_layers: 10
 mlp_depth: 1
 norm_type: Batch

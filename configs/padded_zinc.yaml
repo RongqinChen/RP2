@@ -18,6 +18,6 @@ degree_rescalling: False
 task_type: graph_regression
 num_task: 1
 runs: 5
-pe_method: bern_mixed_sym2
+pe_method: bern_mixed_smooth
 pe_power: 12
 test_eval_interval: 10

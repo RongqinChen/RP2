@@ -17,6 +17,6 @@ jumping_knowledge: last
 degree_rescalling: False
 task_type: graph_regression
 num_task: 1
-pe_method: bern_mixed_sym2
+pe_method: bern_mixed_smooth
 pe_power: 24
 test_eval_interval: 10

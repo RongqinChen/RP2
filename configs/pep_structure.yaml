@@ -8,12 +8,12 @@ num_epochs: 200
 num_warmup_epochs: 10
 hidden_channels: 96
 num_layers: 4
-mlp_depth: 1
+mlp_depth: 2
 norm_type: Batch
 drop_prob: 0.2
 graph_pool: avg
 jumping_knowledge: last
-degree_rescalling: True
+degree_rescalling: False
 task_type: graph_regression
 num_task: 11
 runs: 5

@@ -30,11 +30,7 @@ class BlockMLP(nn.Module):
             in_channels = out_channels
 
     def reset_parameters(self):
-        def _init_conv2d(m: nn.Module):
-            nn.init.xavier_normal_(m.weight)
-            if m.bias is not None:
-                nn.init.zeros_(m.bias)
-        self.convs.apply(_init_conv2d)
+        self.convs.apply(_init_weights)
         self.norms.apply(_init_weights)
 
     def forward(self, inputs: Tensor):
@@ -55,8 +51,15 @@ class BlockMatmulConv(nn.Module):
         # self.scale_weight = nn.Parameter(torch.zeros(1, channels, 1, 1, 2))
 
     def reset_parameters(self):
+        def _init_conv2d(m: nn.Module):
+            if isinstance(m, nn.Conv2d):
+                nn.init.xavier_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
         self.mlp1.apply(_init_weights)
         self.mlp2.apply(_init_weights)
+        self.mlp1.apply(_init_conv2d)
+        self.mlp2.apply(_init_conv2d)
 
     def forward(self, x, log_deg):  # x: B, H, N, N
         mlp1 = self.mlp1(x)

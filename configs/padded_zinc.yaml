@@ -6,9 +6,9 @@ min_lr: 1e-6
 l2_wd: 1e-5
 num_epochs: 2000
 num_warmup_epochs: 50
-emb_channels: 16
+emb_channels: 32
 hidden_channels: 80
-num_layers: 10
+num_layers: 9
 mlp_depth: 2
 norm_type: Batch
 drop_prob: 0.0
@@ -17,6 +17,6 @@ jumping_knowledge: last
 task_type: graph_regression
 num_task: 1
 runs: 5
-pe_method: bern_mixed_sym2
-pe_power: 12
+pe_method: bern_mixed_smooth
+pe_power: 16
 test_eval_interval: 10

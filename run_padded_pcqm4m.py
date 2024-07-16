@@ -1,58 +1,73 @@
 """
-script to run on Peptides-Functional task.
+script to run on QM9 tasks.
 """
+
 import os
 import time
 import numpy as np
 import torch
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, Timer
-from tqdm import tqdm
 # from lightning.pytorch.callbacks.progress import TQDMProgressBar
-import wandb
-from lightning.pytorch.loggers import WandbLogger
-# import swanlab
-# from swanlab.integration.pytorch_lightning import SwanLabLogger
-from sklearn.metrics import average_precision_score
-from torch import Tensor, nn
-from torchmetrics.metric import Metric
+import swanlab
+from swanlab.integration.pytorch_lightning import SwanLabLogger
+# import wandb
+# from lightning.pytorch.loggers import WandbLogger
+from torch import nn
+from torchmetrics import MeanAbsoluteError
+from tqdm import tqdm
 
 import utils
-from models.model_construction import make_seperated_model
-from datasets.peptides_functional import PeptidesFunctionalDataset
+from ogb.lsc import PygPCQM4Mv2Dataset
+from models.model_construction import make_padded_model
 from pl_modules.loader import PlPyGDataTestonValModule
 from pl_modules.model import PlGNNTestonValModule
 from positional_encoding import PositionalEncodingComputation
 
+
 torch.set_num_threads(8)
-torch.set_float32_matmul_precision('medium')
+torch.set_float32_matmul_precision('high')
 
 
 def main():
     parser = utils.args_setup()
-    parser.add_argument("--config_file", type=str, default="configs/pep_functional.yaml",
+    parser.add_argument("--config_file", type=str, default="configs/padded_pcqm4m.yaml",
                         help="Additional configuration file for different dataset and models.")
     args = parser.parse_args()
     args = utils.update_args(args)
 
-    pe_computation = PositionalEncodingComputation(args.pe_method, args.pe_power, flat=True)
-    args.pe_len = pe_computation.pe_len
-    dataset = PeptidesFunctionalDataset("data", transform=pe_computation)
-
-    # pre-compute positional encoding
+    dataset = PygPCQM4Mv2Dataset("data")
+    split_idx = dataset.get_idx_split()
+    rng = np.random.default_rng(seed=42)
+    train_idx = rng.permutation(split_idx["train"].numpy()).tolist()
+    # Leave out 150k graphs for a new validation set.
+    val_idx, train_idx = train_idx[:150000], train_idx[150000:]
+    test_idx = split_idx["valid"].tolist()
+    train_dataset = [dataset[idx] for idx in train_idx]
+    val_dataset = [dataset[idx] for idx in val_idx]
+    test_dataset = [dataset[idx] for idx in test_idx]
+    
+    # pre-computing positional encoding
     time_start = time.perf_counter()
-    dataset._data_list = [pe_computation(data) for data in tqdm(dataset, "Computing PE ...")]
+    pe_computation = PositionalEncodingComputation(args.pe_method, args.pe_power)
+    args.pe_len = pe_computation.pe_len
+    
+    train_dataset = [pe_computation(data) for data in tqdm(train_dataset, 'Computing PE for training set..')]
+    val_dataset = [pe_computation(data) for data in tqdm(val_dataset, 'Computing PE for validation set..')]
+    test_dataset = [pe_computation(data) for data in tqdm(test_dataset, 'Computing PE for testing set..')]
+
     pe_elapsed = time.perf_counter() - time_start
     pe_elapsed = time.strftime("%H:%M:%S", time.gmtime(pe_elapsed)) + f"{pe_elapsed:.2f}"[-3:]
     print(f"Took {pe_elapsed} to compute positional encoding ({args.pe_method}, {args.pe_power}).")
 
-    split_dict = dataset.get_idx_split()
-    train_idx, val_idx, test_idx = split_dict['train'], split_dict['val'], split_dict['test']
-    train_dataset, val_dataset, test_dataset = dataset[train_idx], dataset[val_idx], dataset[test_idx]
-
-    project = os.environ.get("MACHINE", "") + "-Sep-" + args.project_name
+    MACHINE = os.environ.get("MACHINE", "") + "-"
     for i in range(args.runs):
-        logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=project)
+        # logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
+        logger = SwanLabLogger(experiment_name=f"Run-{i}", 
+                               project=MACHINE + args.project_name,
+                               logdir=f"results/PCQM4Mv2/swanlab",
+                               save_dir=args.save_dir,
+                               mode="local" if args.offline else None)
         logger.log_hyperparams(args)
         timer = Timer(duration=dict(weeks=4))
 
@@ -62,14 +77,13 @@ def main():
 
         datamodule = PlPyGDataTestonValModule(
             train_dataset, val_dataset, test_dataset,
-            args.batch_size, args.num_workers, args.drop_last, pad2same=False,
+            args.batch_size, args.num_workers, args.drop_last, pad2same=True,
         )
-        loss_criterion = nn.BCEWithLogitsLoss()
-        evaluator = AveragePrecision()
-        node_encoder = AtomEncoder(args.hidden_channels)
-        edge_encoder = BondEncoder(args.hidden_channels)
-        pe_encoder = PELinear(args.pe_len, args.hidden_channels)
-        model = make_seperated_model(args, node_encoder, edge_encoder, pe_encoder)
+        loss_criterion = nn.L1Loss()
+        evaluator = MeanAbsoluteError()
+        node_encoder = AtomEncoder(args.emb_channels)
+        edge_encoder = BondEncoder(args.emb_channels)
+        model = make_padded_model(args, node_encoder, edge_encoder)
         modelmodule = PlGNNTestonValModule(args, model, loss_criterion, evaluator)
 
         trainer = Trainer(
@@ -77,7 +91,7 @@ def main():
             devices="auto",
             max_epochs=args.num_epochs,
             enable_checkpointing=True,
-            enable_progress_bar=True,
+            enable_progress_bar=False,
             logger=logger,
             callbacks=[
                 # TQDMProgressBar(refresh_rate=20),
@@ -86,6 +100,7 @@ def main():
                 timer
             ]
         )
+        print(model)
 
         trainer.fit(modelmodule, datamodule=datamodule)
         val_result, test_result = trainer.test(modelmodule, datamodule=datamodule, ckpt_path="best")
@@ -98,7 +113,7 @@ def main():
         print("PE computation time:", pe_elapsed)
         print("torch.cuda.max_memory_reserved: %fGB" % (torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024))
         logger.log_metrics(results)
-        wandb.finish()
+        swanlab.finish()
 
     return
 
@@ -161,57 +176,6 @@ class BondEncoder(torch.nn.Module):
             edge_h += embedding(x[:, idx])
 
         return edge_h
-
-
-class PELinear(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.linear = nn.Linear(in_channels, out_channels)
-        self.out_channels = out_channels
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        self.linear.reset_parameters()
-
-    def forward(self, pe_val: Tensor):
-        pe_h = self.linear(pe_val)
-        return pe_h
-
-
-class AveragePrecision(Metric):
-    def __init__(self):
-        super().__init__()
-        self.preds_list = []
-        self.targets_list = []
-
-    def update(self, preds: Tensor, targets: Tensor) -> None:
-        self.preds_list.append(preds.detach().cpu().numpy())
-        self.targets_list.append(targets.detach().cpu().numpy())
-
-    def compute(self) -> Tensor:
-        y_pred = np.concatenate(self.preds_list, 0)
-        y_true = np.concatenate(self.targets_list, 0)
-
-        ap_list = []
-        for i in range(y_true.shape[1]):
-            # AUC is only defined when there is at least one positive data.
-            if np.sum(y_true[:, i] == 1) > 0 and np.sum(y_true[:, i] == 0) > 0:
-                # ignore nan values
-                is_labeled = y_true[:, i] == y_true[:, i]
-                ap = average_precision_score(y_true[is_labeled, i], y_pred[is_labeled, i])
-                ap_list.append(ap)
-
-        if len(ap_list) == 0:
-            raise RuntimeError(
-                'No positively labeled data available. Cannot compute Average Precision.')
-
-        ap = sum(ap_list) / len(ap_list)
-        ap = torch.tensor(ap)
-        return ap
-
-    def reset(self) -> None:
-        self.preds_list.clear()
-        self.targets_list.clear()
 
 
 if __name__ == "__main__":

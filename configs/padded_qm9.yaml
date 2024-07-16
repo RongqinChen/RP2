@@ -8,7 +8,7 @@ num_epochs: 350
 num_warmup_epochs: 20
 emb_channels: 16
 hidden_channels: 80
-num_layers: 10
+num_layers: 9
 mlp_depth: 2
 norm_type: Batch
 drop_prob: 0.0

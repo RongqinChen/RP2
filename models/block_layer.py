@@ -4,7 +4,7 @@ from torch import nn, Tensor
 
 def _init_weights(m: nn.Module):
     if isinstance(m, nn.Conv2d):
-        nn.init.kaiming_normal_(m.weight)
+        nn.init.xavier_normal_(m.weight)
         if m.bias is not None:
             nn.init.zeros_(m.bias)
     elif isinstance(m, nn.BatchNorm2d):
@@ -21,6 +21,7 @@ class BlockMLP(nn.Module):
         self.dropout = nn.Dropout(drop_prob)
         self.convs = nn.ModuleList()
         self.norms = nn.ModuleList()
+        self.norms = nn.ModuleList()
         for _ in range(mlp_depth):
             self.convs.append(nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=True))
             self.norms.append(nn.BatchNorm2d(out_channels))
@@ -36,7 +37,6 @@ class BlockMLP(nn.Module):
             out = self.convs[idx](out)
             out = self.norms[idx](out)
             out = self.activation(out)
-            out = self.dropout(out)
 
         return out
 
@@ -72,8 +72,8 @@ class BlockUpdateLayer(nn.Module):
         self.norm.apply(_init_weights)
         self.update.apply(_init_weights)
 
-    def forward(self, inputs, log_degrees):
-        h = self.matmul_conv(inputs, log_degrees)
+    def forward(self, inputs):
+        h = self.matmul_conv(inputs)
         h = self.activation(self.norm(h))
         h = torch.cat((inputs, h), 1)
         h = self.update(h) + inputs

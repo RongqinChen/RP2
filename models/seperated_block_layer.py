@@ -2,6 +2,7 @@ from typing import List
 import torch
 from torch import nn, Tensor
 from .block_layer import BlockMatmulConv, BlockMLP
+from .basic import Linear
 
 
 def _init_weights(m: nn.Module):
@@ -21,7 +22,12 @@ class SeperatedBlockUpdateLayer(nn.Module):
         self.matmul_conv = BlockMatmulConv(channels, mlp_depth, drop_prob)
         self.norm = nn.BatchNorm1d(channels)
         self.activation = nn.ReLU()
-        self.update = BlockMLP(2 * channels, channels, 2, drop_prob)
+        self.update = nn.Sequential(
+            Linear(2 * channels, channels, True, bias_initializer='zeros'),
+            nn.BatchNorm1d(channels), nn.ReLU(),
+            Linear(channels, channels, True, bias_initializer='zeros'),
+            nn.BatchNorm1d(channels), nn.ReLU(),
+        )
 
     def reset_parameters(self):
         self.matmul_conv.apply(_init_weights)

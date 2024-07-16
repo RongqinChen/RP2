@@ -3,27 +3,29 @@ script to run on PCQM4Mv2 tasks.
 """
 
 import os
+
 # import time
 import numpy as np
+import swanlab
 import torch
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, Timer
 from lightning.pytorch.callbacks.progress import TQDMProgressBar
-import swanlab
+# from tqdm import tqdm
+from ogb.lsc import PygPCQM4Mv2Dataset
 from swanlab.integration.pytorch_lightning import SwanLabLogger
 # import wandb
 # from lightning.pytorch.loggers import WandbLogger
 from torch import nn
+from torch_geometric.transforms import Compose
 from torchmetrics import MeanAbsoluteError
-# from tqdm import tqdm
-from ogb.lsc import PygPCQM4Mv2Dataset
 
 import utils
 from models.model_construction import make_seperated_model
-from pl_modules.loader import PlPyGDataTestonValModule, BatchSamplerWithGrouping
+from pl_modules.loader import BatchSamplerWithGrouping, PlPyGDataTestonValModule
 from pl_modules.model import PlGNNTestonValModule
 from positional_encoding import PositionalEncodingComputation
-
+from torchmetrics.functional.regression.mae import _mean_absolute_error_compute
 
 torch.set_num_threads(8)
 torch.set_float32_matmul_precision('high')
@@ -36,9 +38,7 @@ def main():
     args = parser.parse_args()
     args = utils.update_args(args)
 
-    pe_computation = PositionalEncodingComputation(args.pe_method, args.pe_power, True)
-    args.pe_len = pe_computation.pe_len
-    dataset = PygPCQM4Mv2Dataset("data", transform=pe_computation)
+    dataset = PygPCQM4Mv2Dataset("data")
     slices = dataset.slices
     num_nodes = torch.diff(slices['x'])
     split_idx = dataset.get_idx_split()
@@ -60,6 +60,18 @@ def main():
     test_idx = torch.tensor(test_idx, dtype=torch.long)
     val_dataset = dataset[val_idx]
     test_dataset = dataset[test_idx]
+
+    pe_computation = PositionalEncodingComputation(args.pe_method, args.pe_power, True)
+    args.pe_len = pe_computation.pe_len
+    y_train = dataset._data.y[train_idx]
+    mean, std = y_train.mean(), y_train.std()
+    evaluator = MeanAbsoluteErrorPCQM4M(std)
+    set_y_fn = SetY(mean, std)
+    print("mean, std", mean.item(), std.item())
+    transform = Compose([set_y_fn, pe_computation])
+    train_dataset.transform = transform
+    val_dataset.transform = transform
+    test_dataset.transform = transform
 
     MACHINE = os.environ.get("MACHINE", "") + "-"
     for i in range(args.runs):
@@ -196,6 +208,26 @@ class PELinear(nn.Module):
     def forward(self, pe_val):
         pe_h = self.linear(pe_val)
         return pe_h
+
+
+class MeanAbsoluteErrorPCQM4M(MeanAbsoluteError):
+    def __init__(self, std, **kwargs):
+        super().__init__(**kwargs)
+        self.std = std
+
+    def compute(self):
+        return (_mean_absolute_error_compute(self.sum_abs_error, self.total) * self.std)
+
+
+class SetY(object):
+    def __init__(self, mean, std):
+        super().__init__()
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, data):
+        data.y = (data.y - self.mean) / self.std
+        return data
 
 
 if __name__ == "__main__":

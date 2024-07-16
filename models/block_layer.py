@@ -75,7 +75,7 @@ class BlockUpdateLayer(nn.Module):
         self.skip.apply(_init_weights)
         self.update.apply(_init_weights)
 
-    def forward(self, x):
-        h = self.matmul_conv(x) + self.skip(x)
+    def forward(self, x, log_deg):
+        h = self.matmul_conv(x, log_deg) + self.skip(x)
         h = self.update(h) + h
         return h

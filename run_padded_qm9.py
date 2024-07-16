@@ -189,7 +189,7 @@ class PlGNNTestonValLRscheduleModule(PlGNNTestonValModule):
         super().__init__(args, model, loss_criterion, evaluator)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(
+        optimizer = torch.optim.Adam(
             self.model.parameters(), lr=eval(self.args.lr),
             weight_decay=eval(self.args.l2_wd),
         )

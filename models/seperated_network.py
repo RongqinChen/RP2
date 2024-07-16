@@ -43,7 +43,6 @@ class Seperated_SpecDistGNN(nn.Module):
         graph_pool: Optional[str] = 'avg',
         drop_prob: Optional[float] = 0.0,
         jumping_knowledge: bool = False,
-        degree_rescalling: bool = True,
         task_type: str = "graph_classfication",
         num_tasks: int = 1,
     ):

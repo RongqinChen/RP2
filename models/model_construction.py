@@ -30,7 +30,6 @@ def make_padded_model(
         args.graph_pool,
         args.drop_prob,
         args.jumping_knowledge,
-        args.degree_rescalling,
         args.task_type,
         args.num_task,
     )
@@ -60,7 +59,6 @@ def make_seperated_model(
         args.graph_pool,
         args.drop_prob,
         args.jumping_knowledge,
-        args.degree_rescalling,
         args.task_type,
         args.num_task,
     )

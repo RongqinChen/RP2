@@ -2,7 +2,7 @@ import torch
 from scipy.special import comb
 
 
-def compute_bern_mixed_smooth(adj: torch.Tensor, pe_power: int):
+def compute_bern_mixed_sym2(adj: torch.Tensor, pe_power: int):
     K = pe_power
     deg = adj.sum(dim=0)
     deg_inv_sqrt = deg.pow(-0.5)

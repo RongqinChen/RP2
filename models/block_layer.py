@@ -30,34 +30,12 @@ class BlockMLP(nn.Module):
             in_channels = out_channels
 
     def reset_parameters(self):
-        self.convs.apply(_init_weights)
+        def _init_conv2d(m: nn.Module):
+            nn.init.xavier_normal_(m.weight)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+        self.convs.apply(_init_conv2d)
         self.norms.apply(_init_weights)
-
-    def forward(self, inputs: Tensor):
-        out = inputs
-        for idx in range(len(self.convs)):
-            out = self.convs[idx](out)
-            out = self.norms[idx](out)
-            out = self.activation(out)
-
-        return out
-
-
-class BlockMLP2(nn.Module):
-
-    def __init__(self, in_channels, out_channels, mlp_depth, drop_prob=0.0):
-        super().__init__()
-        self.activation = nn.ReLU()
-        self.dropout = nn.Dropout(drop_prob)
-        self.norms = nn.ModuleList()
-        self.convs = nn.ModuleList()
-        for _ in range(mlp_depth):
-            self.convs.append(nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=True))
-            self.norms.append(nn.BatchNorm2d(out_channels))
-            in_channels = out_channels
-
-    def reset_parameters(self):
-        self.convs.apply(_init_weights)
 
     def forward(self, inputs: Tensor):
         out = inputs

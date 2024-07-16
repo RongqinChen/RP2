@@ -4,7 +4,7 @@ from torch import nn, Tensor
 
 def _init_weights(m: nn.Module):
     if isinstance(m, nn.Conv2d):
-        nn.init.xavier_normal_(m.weight)
+        nn.init.kaiming_normal_(m.weight)
         if m.bias is not None:
             nn.init.zeros_(m.bias)
     elif isinstance(m, nn.BatchNorm2d):
@@ -14,6 +14,30 @@ def _init_weights(m: nn.Module):
 
 
 class BlockMLP(nn.Module):
+
+    def __init__(self, in_channels, out_channels, mlp_depth, drop_prob=0.0):
+        super().__init__()
+        self.activation = nn.ReLU()
+        self.dropout = nn.Dropout(drop_prob)
+        self.norms = nn.ModuleList()
+        self.convs = nn.ModuleList()
+        for _ in range(mlp_depth):
+            self.convs.append(nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=True))
+            in_channels = out_channels
+
+    def reset_parameters(self):
+        self.convs.apply(_init_weights)
+
+    def forward(self, inputs: Tensor):
+        out = inputs
+        for idx in range(len(self.convs)):
+            out = self.convs[idx](out)
+            out = self.activation(out)
+
+        return out
+
+
+class BlockMLP2(nn.Module):
 
     def __init__(self, in_channels, out_channels, mlp_depth, drop_prob=0.0):
         super().__init__()
@@ -62,7 +86,7 @@ class BlockUpdateLayer(nn.Module):
         super().__init__()
         self.matmul_conv = BlockMatmulConv(channels, mlp_depth, drop_prob)
         self.skip = nn.Conv2d(2 * channels, channels, kernel_size=1, bias=True)
-        self.update = BlockMLP(channels, channels, 2, drop_prob)
+        self.update = BlockMLP2(channels, channels, 2, drop_prob)
 
     def reset_parameters(self):
         self.matmul_conv.apply(_init_weights)

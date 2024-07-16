@@ -11,7 +11,6 @@ from torch import Tensor
 from .basic import JK_MLP
 from .block_layer import BlockUpdateLayer
 from .block_pooling import block_avg_pooling, block_sum_pooling
-from .degree_rescaler import DegreeRescaler
 from .output_decoder import GraphClassification, GraphRegression, NodeClassification
 
 
@@ -74,14 +73,7 @@ class Padded_SpecDistGNN(nn.Module):
         jk_channels = hidden_channels * 2 * (num_layers + 1)
         self.jk_mlp = JK_MLP(jk_channels, hidden_channels) if jumping_knowledge == "concat" else None
 
-        # 4th part - degree rescalling
-        if degree_rescalling:
-            assert graph_pool in {"avg", "mean"}
-            self.degree_rescaler = DegreeRescaler(hidden_channels * 2)
-        else:
-            self.degree_rescaler = None
-
-        # 5th part - output decoding
+        # 4th part - output decoding
         if task_type == "graph_classification":
             self.out_decoder = GraphClassification(hidden_channels * 2, num_tasks)
         elif task_type == "graph_regression":
@@ -117,13 +109,11 @@ class Padded_SpecDistGNN(nn.Module):
         h = torch.cat(hs, 1) if len(hs) > 1 else hs[0]
         h = self.conv0(h)
 
-        degrees = data["batch_num_nodes"]
-        log_degrees = torch.log(degrees + 1.)
-        log_degrees = log_degrees.view((-1, 1, 1, 1))
+        # batch_num_nodes = data["batch_num_nodes"]
 
         h_list = []
         for block in self.blocks:
-            h = block(h, log_degrees)
+            h = block(h)
             h_list.append(h)
 
         if self.jk_mlp is not None:
@@ -131,10 +121,6 @@ class Padded_SpecDistGNN(nn.Module):
             z = self.jk_mlp(torch.cat(z_list, 1))
         else:
             z = self.graph_pool(h_list[-1])
-
-        if self.degree_rescaler is not None:
-            log_degrees = log_degrees.view((-1, 1))
-            z = self.degree_rescaler(z, log_degrees)
 
         out = self.out_decoder(z)
         return out

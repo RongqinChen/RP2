@@ -12,7 +12,6 @@ from torch import Tensor
 from .basic import JK_MLP
 from .seperated_block_layer import SeperatedBlockUpdateLayer
 from .seperated_pooling import seperated_avg_pooling, seperated_sum_pooling
-from .degree_rescaler import DegreeRescaler
 from .output_decoder import GraphClassification, GraphRegression, NodeClassification
 
 

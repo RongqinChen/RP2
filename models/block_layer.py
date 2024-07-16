@@ -56,7 +56,7 @@ class BlockMatmulConv(nn.Module):
     def forward(self, x, log_deg):  # x: B, H, N, N
         mlp1 = self.mlp1(x)
         mlp2 = self.mlp2(x)
-        x = torch.matmul(mlp1, mlp2)
+        x = torch.matmul(mlp1, mlp2) / x.shape[-1]
         x = torch.sqrt(torch.relu(x))
         # x = torch.stack([x, x * log_deg], dim=-1)
         # x = (x * self.scale_weight).sum(dim=-1)

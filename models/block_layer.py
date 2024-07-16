@@ -48,10 +48,6 @@ class BlockMatmulConv(nn.Module):
         self.mlp2 = BlockMLP(channels, channels, mlp_depth, drop_prob)
 
     def reset_parameters(self):
-        # def _init_conv2d(m: nn.Module):
-        #     nn.init.xavier_normal_(m.weight)
-        #     if m.bias is not None:
-        #         nn.init.zeros_(m.bias)
         self.mlp1.apply(_init_weights)
         self.mlp2.apply(_init_weights)
 

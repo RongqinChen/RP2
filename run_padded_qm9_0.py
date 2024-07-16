@@ -76,7 +76,7 @@ def main():
         test_dataset._data_list = dataset._data_list
         val_dataset._data_list = dataset._data_list
 
-        MACHINE = os.environ.get("MACHINE", "") + "-v716-"
+        MACHINE = os.environ.get("MACHINE", "") + "-v717-"
         logger = WandbLogger(target_names[target], args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
         # logger = SwanLabLogger(experiment_name=target_names[target],
         #                        project=MACHINE + args.project_name,

@@ -13,10 +13,9 @@ norm_type: Batch
 drop_prob: 0.0
 graph_pool: avg
 jumping_knowledge: last
-degree_rescalling: False
 task_type: graph_regression
 num_task: 1
 runs: 5
-pe_method: bern_mixed_smooth
+pe_method: bern_mixed_sym2
 pe_power: 16
 test_eval_interval: 10

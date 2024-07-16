@@ -27,7 +27,7 @@ torch.set_float32_matmul_precision('high')
 
 def main():
     parser = utils.args_setup()
-    parser.add_argument("--config_file", type=str, default="configs/zincfull.yaml",
+    parser.add_argument("--config_file", type=str, default="configs/padded_zincfull.yaml",
                         help="Additional configuration file for different dataset and models.")
     args = parser.parse_args()
     args = utils.update_args(args)
@@ -49,7 +49,7 @@ def main():
     pe_elapsed = time.strftime("%H:%M:%S", time.gmtime(pe_elapsed)) + f"{pe_elapsed:.2f}"[-3:]
     print(f"Took {pe_elapsed} to compute positional encoding ({args.pe_method}, {args.pe_power}).")
 
-    MACHINE = os.environ.get("MACHINE", "") + "-"
+    MACHINE = os.environ.get("MACHINE", "") + "-v717-"
     for i in range(args.runs):
         logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
         # logger = SwanLabLogger(experiment_name=f"Run-{i}", project=MACHINE + args.project_name,

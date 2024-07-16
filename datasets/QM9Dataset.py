@@ -49,7 +49,7 @@ atomrefs = {
 }
 
 target_names = [
-    "mu", "alpha", "HOMO", "LUMO", "Delta", "R^2", "U_0", "U", "H", "G", "C_v"
+    "mu", "alpha", "HOMO", "LUMO", "Delta", "R^2", "ZPVE", "U_0", "U", "H", "G", "C_v", "12"
 ]
 
 

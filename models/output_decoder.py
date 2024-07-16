@@ -17,7 +17,7 @@ class GraphClassification(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
         super(GraphClassification, self).__init__()
         self.classifier = nn.Sequential(
-            Linear(in_channels, in_channels // 2), nn.GELU(),
+            Linear(in_channels, in_channels // 2), nn.ReLU(),
             Linear(in_channels // 2, out_channels)
         )
 
@@ -33,8 +33,8 @@ class GraphRegression(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
         super(GraphRegression, self).__init__()
         self.regressor = nn.Sequential(
-            Linear(in_channels, in_channels // 2), nn.GELU(),
-            Linear(in_channels // 2, in_channels // 4), nn.GELU(),
+            Linear(in_channels, in_channels // 2), nn.ReLU(),
+            Linear(in_channels // 2, in_channels // 4), nn.ReLU(),
             Linear(in_channels // 4, out_channels)
         )
 
@@ -50,7 +50,7 @@ class NodeClassification(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
         super(NodeClassification, self).__init__()
         self.classifier = nn.Sequential(
-            Linear(in_channels, in_channels // 2), nn.GELU(),
+            Linear(in_channels, in_channels // 2), nn.ReLU(),
             Linear(in_channels // 2, out_channels)
         )
 

@@ -12,7 +12,6 @@ from torch import Tensor
 from .basic import JK_MLP
 from .seperated_block_layer import SeperatedBlockUpdateLayer
 from .seperated_pooling import seperated_avg_pooling, seperated_sum_pooling
-from .degree_rescaler import DegreeRescaler
 from .output_decoder import GraphClassification, GraphRegression, NodeClassification
 
 
@@ -44,7 +43,6 @@ class Seperated_SpecDistGNN(nn.Module):
         graph_pool: Optional[str] = 'avg',
         drop_prob: Optional[float] = 0.0,
         jumping_knowledge: bool = False,
-        degree_rescalling: bool = True,
         task_type: str = "graph_classfication",
         num_tasks: int = 1,
     ):
@@ -80,14 +78,7 @@ class Seperated_SpecDistGNN(nn.Module):
         jk_channels = hidden_channels * 2 * (num_layers + 1)
         self.jk_mlp = JK_MLP(jk_channels, hidden_channels) if jumping_knowledge == "concat" else None
 
-        # 4th part - degree rescalling
-        if degree_rescalling:
-            assert graph_pool in {"avg", "mean"}
-            self.degree_rescaler = DegreeRescaler(hidden_channels * 2)
-        else:
-            self.degree_rescaler = None
-
-        # 5th part - output decoding
+        # 4th part - output decoding
         if task_type == "graph_classification":
             self.out_decoder = GraphClassification(hidden_channels * 2, num_tasks)
         elif task_type == "graph_regression":
@@ -127,16 +118,12 @@ class Seperated_SpecDistGNN(nn.Module):
             torch.cat(idx_list, dim=1), torch.cat(val_list, dim=0), N, N, op="add",
         )
 
-        degrees = data["batch_num_nodes"]
-        log_degrees = torch.log(degrees + 1.)
-        log_degrees = log_degrees.view((-1, 1, 1, 1))
+        # degrees = data["batch_num_nodes"]
         len1d = data["len1d"]
         size3d = data["size3d"]
-        sep_size = [s[0] for s in size3d]
-        sep_log_degs = torch.split(log_degrees, sep_size)
         h_list = [h]
         for block in self.blocks:
-            h = block(h, sep_log_degs, len1d, size3d)  # shape: total_num_edges, self.hidden_channels
+            h = block(h, len1d, size3d)  # shape: total_num_edges, self.hidden_channels
             h_list.append(h)
 
         if self.jk_mlp is not None:
@@ -147,10 +134,6 @@ class Seperated_SpecDistGNN(nn.Module):
         hs = torch.split(h, len1d, 0)
         bs = [h.reshape(s + (-1,)) for h, s in zip(hs, size3d)]
         z = self.seperated_pooling(bs)
-
-        if self.degree_rescaler is not None:
-            log_degrees = log_degrees.view((-1, 1))
-            z = self.degree_rescaler(z, log_degrees)
 
         out = self.out_decoder(z)
         return out

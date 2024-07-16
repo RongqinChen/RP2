@@ -1,8 +1,7 @@
 from typing import List
 import torch
 from torch import nn, Tensor
-from .basic import Linear
-from .block_layer import BlockMatmulConv
+from .block_layer import BlockMatmulConv, BlockMLP
 
 
 def _init_weights(m: nn.Module):
@@ -10,6 +9,8 @@ def _init_weights(m: nn.Module):
         nn.init.kaiming_normal_(m.weight)
         if m.bias is not None:
             nn.init.zeros_(m.bias)
+    elif isinstance(m, nn.BatchNorm2d):
+        m.reset_parameters()
     elif hasattr(m, "reset_parameters"):
         m.reset_parameters()
 
@@ -18,31 +19,25 @@ class SeperatedBlockUpdateLayer(nn.Module):
     def __init__(self, channels, mlp_depth, drop_prob) -> None:
         super().__init__()
         self.matmul_conv = BlockMatmulConv(channels, mlp_depth, drop_prob)
-        # self.skip = nn.Conv2d(channels, channels, kernel_size=1, bias=True)
-        self.norm = nn.BatchNorm2d(channels)
-        self.update = nn.Sequential(
-            Linear(channels, channels, bias_initializer="zeros"),
-            nn.BatchNorm1d(channels), nn.ReLU(),
-            Linear(channels, channels, bias_initializer="zeros"),
-            nn.BatchNorm1d(channels), nn.ReLU(),
-        )
+        self.norm = nn.BatchNorm1d(channels)
         self.activation = nn.ReLU()
+        self.update = BlockMLP(2 * channels, channels, 2, drop_prob)
 
     def reset_parameters(self):
         self.matmul_conv.apply(_init_weights)
-        # self.skip.apply(_init_weights)
         self.norm.apply(_init_weights)
         self.update.apply(_init_weights)
 
-    def forward(self, x: Tensor, sep_log_deg, len1d, size3d):
+    def forward(self, x: Tensor, len1d, size3d):
         xs = torch.split(x, len1d, 0)
         bs = [x.reshape(s + (-1,)) for x, s in zip(xs, size3d)]
         bs = [b.permute((0, 3, 1, 2)) for b in bs]
 
-        hs: List[Tensor] = [self.matmul_conv(b, logdeg) for b, logdeg in zip(bs, sep_log_deg)]
+        hs: List[Tensor] = [self.matmul_conv(b) for b in bs]
         hs = [h.permute((0, 2, 3, 1)).flatten(0, 2) for h in hs]
         h = torch.cat(hs).contiguous()
 
-        h = h + x
-        h = self.update(h) + h
+        h = self.activation(self.norm(h))
+        h = torch.cat((x, h), 1)
+        h = self.update(h) + x
         return h

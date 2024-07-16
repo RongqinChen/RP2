@@ -49,7 +49,7 @@ def main():
     pe_elapsed = time.strftime("%H:%M:%S", time.gmtime(pe_elapsed)) + f"{pe_elapsed:.2f}"[-3:]
     print(f"Took {pe_elapsed} to compute positional encoding ({args.pe_method}, {args.pe_power}).")
 
-    MACHINE = os.environ.get("MACHINE", "") + "-"
+    MACHINE = os.environ.get("MACHINE", "") + "-v717-"
     for i in range(args.runs):
         # logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=MACHINE + args.project_name)
         logger = SwanLabLogger(experiment_name=f"Run-{i}",

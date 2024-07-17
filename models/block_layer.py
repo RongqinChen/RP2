@@ -20,17 +20,21 @@ class BlockMLP(nn.Module):
         self.activation = nn.ReLU()
         self.dropout = nn.Dropout(drop_prob)
         self.convs = nn.ModuleList()
+        self.norms = nn.ModuleList()
         for _ in range(mlp_depth):
             self.convs.append(nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=True))
+            self.norms.append(nn.BatchNorm2d(out_channels))
             in_channels = out_channels
 
     def reset_parameters(self):
         self.convs.apply(_init_weights)
+        self.norms.apply(_init_weights)
 
     def forward(self, inputs: Tensor):
         out = inputs
         for idx in range(len(self.convs)):
             out = self.convs[idx](out)
+            out = self.norms[idx](out)
             out = self.activation(out)
 
         return out

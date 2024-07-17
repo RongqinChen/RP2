@@ -32,10 +32,11 @@ class BlockMLP(nn.Module):
 
     def forward(self, inputs: Tensor):
         out = inputs
-        for idx in range(len(self.convs)):
-            out = self.convs[idx](out)
+        out = self.convs[0](out)
+        for idx in range(1, len(self.convs)):
             out = self.norms[idx](out)
             out = self.activation(out)
+            out = self.convs[idx](out)
 
         return out
 

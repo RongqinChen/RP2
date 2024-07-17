@@ -67,6 +67,7 @@ def main():
     mean, std = y_train.mean(), y_train.std()
     evaluator = MeanAbsoluteErrorPCQM4M(std)
     set_y_fn = SetY(mean, std)
+    print("mean, std", mean.item(), std.item())
     transform = Compose([set_y_fn, pe_computation])
     train_dataset.transform = transform
     val_dataset.transform = transform

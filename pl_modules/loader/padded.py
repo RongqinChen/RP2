@@ -16,7 +16,7 @@ class PadCollater:
     def __call__(self, batch: List[Data]) -> dict:
         pe_list = [data["pe"] for data in batch]
         num_nodes = [data.num_nodes for data in batch]
-        maxN = self.max_num_nodes
+        maxN = self.max_num_nodes if self.max_num_nodes is not None else max(num_nodes)
 
         batch_node_attr = torch.nn.utils.rnn.pad_sequence(
             [data.x + 1 for data in batch],  # `x + 1` because 0s for padding
@@ -97,7 +97,8 @@ class PadDataLoader(torch.utils.data.DataLoader):
         shuffle: bool = False,
         drop_last: bool = True,
         num_workers: int = 1,
-        max_num_nodes: int = 1,
+        max_num_nodes: Optional[int] = None,
+        batch_sampler=None,
         follow_batch: Optional[List[str]] = None,
         exclude_keys: Optional[List[str]] = None,
         **kwargs,
@@ -114,6 +115,7 @@ class PadDataLoader(torch.utils.data.DataLoader):
             dataset=dataset,
             batch_size=batch_size,
             shuffle=shuffle,
+            batch_sampler=batch_sampler,
             num_workers=num_workers,
             collate_fn=PadCollater(max_num_nodes, follow_batch, exclude_keys),
             drop_last=drop_last,

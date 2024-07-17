@@ -108,6 +108,7 @@ class PlPyGDataModule(LightningDataModule):
         self.pad2same = pad2same
         self.follow_batch = follow_batch
         self.exclude_keys = exclude_keys
+        self.train_sampler = train_sampler
         if self.pad2same:
             if max_num_nodes is None:
                 self.max_num_nodes = max(
@@ -117,8 +118,6 @@ class PlPyGDataModule(LightningDataModule):
                 )
             else:
                 self.max_num_nodes = max_num_nodes
-        else:
-            self.train_sampler = train_sampler
 
     def _get_loader(self, split):
         if split == "train":

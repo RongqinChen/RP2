@@ -55,7 +55,7 @@ class BlockMatmulConv(nn.Module):
         mlp1 = self.mlp1(x)
         mlp2 = self.mlp2(x)
         x = torch.matmul(mlp1, mlp2)
-        x = torch.sqrt(torch.relu(x))
+        x = torch.sqrt(torch.relu(x)) - torch.sqrt(torch.relu(-x))
         return x
 
 

@@ -14,10 +14,11 @@ from lightning.pytorch.loggers import WandbLogger
 # from swanlab.integration.pytorch_lightning import SwanLabLogger
 from torch import Tensor, nn
 from torch_geometric.datasets import ZINC
+from tqdm import tqdm
 
 import utils
 from models.model_construction import make_seperated_model
-from pl_modules.loader import PlPyGDataTestonValModule
+from pl_modules.loader import BatchSamplerWithGrouping, PlPyGDataTestonValModule
 from pl_modules.model import PlGNNTestonValModule
 from positional_encoding import PositionalEncodingComputation
 
@@ -38,13 +39,21 @@ def main():
     val_dataset = ZINC(path, not args.full, "val")
     test_dataset = ZINC(path, not args.full, "test")
 
+    train_num_nodes = torch.diff(train_dataset.slices['x'])
+    val_num_nodes = torch.diff(val_dataset.slices['x'])
+    test_num_nodes = torch.diff(test_dataset.slices['x'])
+    train_sampler = BatchSamplerWithGrouping(train_num_nodes, args.batch_size, True, False)
+
+    val_idx = [idx for idx in sorted(range(len(val_num_nodes)), key=lambda idx: val_num_nodes[idx])]
+    test_idx = [idx for idx in sorted(range(len(test_num_nodes)), key=lambda idx: test_num_nodes[idx])]
+
     # pre-compute positional encoding
     time_start = time.perf_counter()
     pe_computation = PositionalEncodingComputation(args.pe_method, args.pe_power, True)
     args.pe_len = pe_computation.pe_len
-    train_dataset._data_list = [pe_computation(data) for data in train_dataset]
-    val_dataset._data_list = [pe_computation(data) for data in val_dataset]
-    test_dataset._data_list = [pe_computation(data) for data in test_dataset]
+    train_dataset = [pe_computation(data) for data in tqdm(train_dataset)]
+    val_dataset = [pe_computation(val_dataset[idx]) for idx in tqdm(val_idx)]
+    test_dataset = [pe_computation(test_dataset[idx]) for idx in tqdm(test_idx)]
     pe_elapsed = time.perf_counter() - time_start
     pe_elapsed = time.strftime("%H:%M:%S", time.gmtime(pe_elapsed)) + f"{pe_elapsed:.2f}"[-3:]
     print(f"Took {pe_elapsed} to compute positional encoding ({args.pe_method}, {args.pe_power}).")
@@ -64,7 +73,8 @@ def main():
 
         datamodule = PlPyGDataTestonValModule(
             train_dataset, val_dataset, test_dataset,
-            args.batch_size, args.num_workers, args.drop_last, pad2same=False,
+            args.batch_size, args.num_workers, args.drop_last,
+            pad2same=False, train_sampler=train_sampler
         )
         loss_criterion = nn.L1Loss()
         evaluator = torchmetrics.MeanAbsoluteError()

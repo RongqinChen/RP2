@@ -18,7 +18,8 @@ from tqdm import tqdm
 
 import utils
 from models.model_construction import make_seperated_model
-from pl_modules.loader import BatchSamplerWithGrouping, PlPyGDataTestonValModule
+# from pl_modules.loader import BatchSamplerWithGrouping
+from pl_modules.loader import PlPyGDataTestonValModule
 from pl_modules.model import PlGNNTestonValModule
 from positional_encoding import PositionalEncodingComputation
 
@@ -39,10 +40,10 @@ def main():
     val_dataset = ZINC(path, not args.full, "val")
     test_dataset = ZINC(path, not args.full, "test")
 
-    train_num_nodes = torch.diff(train_dataset.slices['x'])
+    # train_num_nodes = torch.diff(train_dataset.slices['x'])
     val_num_nodes = torch.diff(val_dataset.slices['x'])
     test_num_nodes = torch.diff(test_dataset.slices['x'])
-    train_sampler = BatchSamplerWithGrouping(train_num_nodes, args.batch_size, True, False)
+    # train_sampler = BatchSamplerWithGrouping(train_num_nodes, args.batch_size, True, False)
 
     val_idx = [idx for idx in sorted(range(len(val_num_nodes)), key=lambda idx: val_num_nodes[idx])]
     test_idx = [idx for idx in sorted(range(len(test_num_nodes)), key=lambda idx: test_num_nodes[idx])]
@@ -74,7 +75,8 @@ def main():
         datamodule = PlPyGDataTestonValModule(
             train_dataset, val_dataset, test_dataset,
             args.batch_size, args.num_workers, args.drop_last,
-            pad2same=False, train_sampler=train_sampler
+            pad2same=False,
+            #   train_sampler=train_sampler
         )
         loss_criterion = nn.L1Loss()
         evaluator = torchmetrics.MeanAbsoluteError()

@@ -105,9 +105,9 @@ class Seperated_SpecDistGNN(nn.Module):
 
     def forward(self, data: Dict[str, Tensor]) -> Tensor:
         idx_list = [data["batch_full_index"]]
-        val_list = [idx_list[0].new_zeros((idx_list[0].size(1), self.hidden_channels))]
-        idx_list += [data["batch_pe_index"]]
-        val_list += [self.pe_encoder(data["batch_pe_val"])]
+        # val_list = [idx_list[0].new_zeros((idx_list[0].size(1), self.hidden_channels))]
+        # idx_list += [data["batch_pe_index"]]
+        val_list = [self.pe_encoder(data["batch_pe_val"])]
         idx_list += [data["batch_edge_index"]]
         val_list += [self.edge_encoder(data["batch_edge_val"])]
         idx_list += [data["batch_eye_index"]]

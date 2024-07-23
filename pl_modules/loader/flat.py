@@ -44,8 +44,8 @@ class FlatCollater:
 
         pe_val = [data["pe_val"] for data in batch]
         batch_pe_val = torch.cat(pe_val, 0)
-        batch_pe_index = [data["pe_index"] + slice for data, slice in zip(batch, node_slice)]
-        batch_pe_index = torch.cat(batch_pe_index, 1)
+        # batch_pe_index = [data["pe_index"] + slice for data, slice in zip(batch, node_slice)]
+        # batch_pe_index = torch.cat(batch_pe_index, 1)
 
         full_index = [
             torch.ones((n, n), dtype=torch.short).nonzero(as_tuple=False).t() for n in nn
@@ -70,7 +70,8 @@ class FlatCollater:
             "node_batch": node_batch,
             "batch_eye_index": batch_eye_index, "batch_node_val": batch_node_val,
             "batch_edge_index": batch_edge_index, "batch_edge_val": batch_edge_val,
-            "batch_pe_index": batch_pe_index, "batch_pe_val": batch_pe_val,
+            # "batch_pe_index": batch_pe_index,
+            "batch_pe_val": batch_pe_val,
             "batch_full_index": batch_full_index,
             "len1d": len1d, "size3d": size3d, "y": y
         }

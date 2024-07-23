@@ -59,7 +59,7 @@ class BlockMatmulConv(nn.Module):
     def forward(self, x):  # x: B, H, N, N
         mlp1 = self.mlp1(x)
         mlp2 = self.mlp2(x)
-        x = torch.matmul(mlp1, mlp2) / x.shape[-1]
+        x = torch.matmul(mlp1, mlp2)
         x = torch.sqrt(torch.relu(x))
         return x
 

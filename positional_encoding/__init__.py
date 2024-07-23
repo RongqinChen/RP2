@@ -50,10 +50,10 @@ class PositionalEncodingComputation(object):
         pe = self.compute_pe(adj, self.pe_power)
         if self.flat:
             pe = pe.permute((1, 2, 0))
-            pe_index = pe.abs().sum([i for i in range(2, pe.dim())]).nonzero().t_()
-            pe_val = pe[pe_index[0], pe_index[1], :].contiguous()
-            data["pe_index"] = pe_index
-            data["pe_val"] = pe_val
+            # pe_index = pe.abs().sum([i for i in range(2, pe.dim())]).nonzero().t_()
+            # pe_val = pe[pe_index[0], pe_index[1], :].contiguous()
+            # data["pe_index"] = pe_index
+            data["pe_val"] = pe
         else:
             data["pe"] = pe
         return data

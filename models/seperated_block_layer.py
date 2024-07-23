@@ -59,7 +59,7 @@ class BlockMatmulConv(nn.Module):
     def forward(self, x):  # x: B, H, N, N
         mlp1 = self.mlp1(x)
         mlp2 = self.mlp2(x)
-        x = torch.matmul(mlp1, mlp2)
+        x = torch.matmul(mlp1, mlp2) / x.shape[-1]
         x = torch.sqrt(torch.relu(x))
         return x
 
@@ -82,7 +82,7 @@ class SeperatedBlockUpdateLayer(nn.Module):
     def forward(self, x: Tensor, len1d, size3d):
         xs = torch.split(x, len1d, 0)
         bs = [x.reshape(s + (-1,)) for x, s in zip(xs, size3d)]
-        bs = [b.permute((0, 3, 1, 2)) for b in bs]
+        bs = [b.permute((0, 3, 1, 2)).contiguous() for b in bs]
 
         hs: List[Tensor] = [self.matmul_conv(b) for b in bs]
         hs = [h.permute((0, 2, 3, 1)).contiguous().view((-1, x.shape[-1])) for h in hs]

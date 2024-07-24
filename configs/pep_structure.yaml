@@ -1,5 +1,5 @@
 dataset_name: Structure
-batch_size: 16
+batch_size: 32
 num_workers: 4
 lr: 3e-4
 min_lr: 1e-6

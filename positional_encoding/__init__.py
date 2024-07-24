@@ -53,7 +53,7 @@ class PositionalEncodingComputation(object):
             # pe_index = pe.abs().sum([i for i in range(2, pe.dim())]).nonzero().t_()
             # pe_val = pe[pe_index[0], pe_index[1], :].contiguous()
             # data["pe_index"] = pe_index
-            data["pe_val"] = pe
+            data["pe_val"] = pe.contiguous().flatten(0, 1)
         else:
             data["pe"] = pe
         return data

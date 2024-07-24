@@ -28,7 +28,7 @@ torch.set_float32_matmul_precision('medium')
 
 def main():
     parser = utils.args_setup()
-    parser.add_argument("--config_file", type=str, default="configs/structure.yaml",
+    parser.add_argument("--config_file", type=str, default="configs/pep_structure.yaml",
                         help="Additional configuration file for different dataset and models.")
     args = parser.parse_args()
     args = utils.update_args(args)
@@ -47,6 +47,14 @@ def main():
     split_dict = dataset.get_idx_split()
     train_idx, val_idx, test_idx = split_dict['train'], split_dict['val'], split_dict['test']
     train_dataset, val_dataset, test_dataset = dataset[train_idx], dataset[val_idx], dataset[test_idx]
+
+    num_nodes = torch.diff(dataset.slices['x'])
+    val_num_nodes = num_nodes[val_idx]
+    test_num_nodes = num_nodes[test_idx]
+    val_idx = [idx for idx in sorted(range(len(val_num_nodes)), key=lambda idx: val_num_nodes[idx])]
+    test_idx = [idx for idx in sorted(range(len(test_num_nodes)), key=lambda idx: test_num_nodes[idx])]
+    val_dataset = [val_dataset[idx] for idx in val_idx]
+    test_dataset = [test_dataset[idx] for idx in test_idx]
 
     project = os.environ.get("MACHINE", "") + "-Sep-" + args.project_name
     for i in range(args.runs):

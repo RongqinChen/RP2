@@ -6,7 +6,7 @@ min_lr: 1e-6
 l2_wd: 1e-5
 num_epochs: 200
 num_warmup_epochs: 10
-hidden_channels: 96
+hidden_channels: 80
 num_layers: 4
 mlp_depth: 2
 norm_type: Batch
@@ -17,5 +17,5 @@ task_type: graph_regression
 num_task: 11
 runs: 5
 pe_method: bern_mixed_sym2
-pe_power: 24
+pe_power: 8
 test_eval_interval: 10

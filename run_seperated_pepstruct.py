@@ -83,7 +83,7 @@ def main():
             devices="auto",
             max_epochs=args.num_epochs,
             enable_checkpointing=True,
-            enable_progress_bar=True,
+            enable_progress_bar=False,
             logger=logger,
             callbacks=[
                 # TQDMProgressBar(refresh_rate=20),

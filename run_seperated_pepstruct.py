@@ -23,7 +23,7 @@ from pl_modules.model import PlGNNTestonValModule
 from positional_encoding import PositionalEncodingComputation
 
 torch.set_num_threads(8)
-torch.set_float32_matmul_precision('medium')
+torch.set_float32_matmul_precision('high')
 
 
 def main():

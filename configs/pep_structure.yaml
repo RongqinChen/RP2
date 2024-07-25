@@ -1,6 +1,6 @@
 dataset_name: Structure
 batch_size: 32
-num_workers: 4
+num_workers: 8
 lr: 3e-4
 min_lr: 1e-6
 l2_wd: 1e-5
@@ -17,5 +17,5 @@ task_type: graph_regression
 num_task: 11
 runs: 5
 pe_method: bern_mixed_sym2
-pe_power: 8
+pe_power: 12
 test_eval_interval: 10

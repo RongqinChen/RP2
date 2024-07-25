@@ -9,10 +9,10 @@ from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, Timer
 from tqdm import tqdm
 # from lightning.pytorch.callbacks.progress import TQDMProgressBar
-import wandb
-from lightning.pytorch.loggers import WandbLogger
-# import swanlab
-# from swanlab.integration.pytorch_lightning import SwanLabLogger
+# import wandb
+# from lightning.pytorch.loggers import WandbLogger
+import swanlab
+from swanlab.integration.pytorch_lightning import SwanLabLogger
 from sklearn.metrics import average_precision_score
 from torch import Tensor, nn
 from torchmetrics.metric import Metric
@@ -25,7 +25,7 @@ from pl_modules.model import PlGNNTestonValModule
 from positional_encoding import PositionalEncodingComputation
 
 torch.set_num_threads(8)
-torch.set_float32_matmul_precision('medium')
+torch.set_float32_matmul_precision('high')
 
 
 def main():
@@ -50,9 +50,23 @@ def main():
     train_idx, val_idx, test_idx = split_dict['train'], split_dict['val'], split_dict['test']
     train_dataset, val_dataset, test_dataset = dataset[train_idx], dataset[val_idx], dataset[test_idx]
 
+    num_nodes = torch.diff(dataset.slices['x'])
+    val_num_nodes = num_nodes[val_idx]
+    test_num_nodes = num_nodes[test_idx]
+    val_idx = [idx for idx in sorted(range(len(val_num_nodes)), key=lambda idx: val_num_nodes[idx])]
+    test_idx = [idx for idx in sorted(range(len(test_num_nodes)), key=lambda idx: test_num_nodes[idx])]
+    val_dataset = [val_dataset[idx] for idx in val_idx]
+    test_dataset = [test_dataset[idx] for idx in test_idx]
+
     project = os.environ.get("MACHINE", "") + "-Sep-" + args.project_name
     for i in range(args.runs):
-        logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=project)
+        # logger = WandbLogger(f"Run-{i}", args.save_dir, offline=args.offline, project=project)
+        logger = SwanLabLogger(experiment_name=f"func-Run{i}",
+                               project=project,
+                               logdir="results/func/swanlab",
+                               save_dir=args.save_dir,
+                               mode="local" if args.offline else None)
+
         logger.log_hyperparams(args)
         timer = Timer(duration=dict(weeks=4))
 
@@ -77,7 +91,7 @@ def main():
             devices="auto",
             max_epochs=args.num_epochs,
             enable_checkpointing=True,
-            enable_progress_bar=True,
+            enable_progress_bar=False,
             logger=logger,
             callbacks=[
                 # TQDMProgressBar(refresh_rate=20),
@@ -98,7 +112,7 @@ def main():
         print("PE computation time:", pe_elapsed)
         print("torch.cuda.max_memory_reserved: %fGB" % (torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024))
         logger.log_metrics(results)
-        wandb.finish()
+        swanlab.finish()
 
     return
 
